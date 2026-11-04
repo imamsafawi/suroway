@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SuroWay – Rencana Perjalanan Cerdas Surabaya</title>
+<title>SuroWay – Smart Transit Planner Surabaya</title>
 <meta name="theme-color" content="#059669">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -44,7 +44,7 @@ html.dark .leaflet-control,html.dark .leaflet-bar a{background:#1e293b;color:#e2
   <div class="p-3 bg-emerald-600 text-white flex items-center justify-between gap-2">
     <div class="flex items-center gap-2 min-w-0">
       <div class="bg-white/20 p-2 rounded-xl text-xl">🚌</div>
-      <div class="min-w-0"><h1 class="font-extrabold text-xl leading-none">SuroWay</h1><p class="text-[11px] text-emerald-100 truncate">Rencana Perjalanan Cerdas Surabaya</p></div>
+      <div class="min-w-0"><h1 class="font-extrabold text-xl leading-none">SuroWay</h1><p class="text-[11px] text-emerald-100 truncate">Smart Transit Planner Surabaya</p></div>
     </div>
     <div class="flex items-center gap-1 text-sm">
       <button id="installBtn" onclick="doInstall()" class="hidden bg-white/20 rounded-lg px-2 py-1" title="Pasang aplikasi">📲</button>
@@ -305,7 +305,7 @@ async function geocode(q){
   showMsg(T('Mencari alamat…','Searching address…'),true);
   try{
     const u='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=id&bounded=1&viewbox=112.55,-7.10,112.90,-7.45&accept-language='+LANG+'&q='+encodeURIComponent(q);
-    const r=await fetch(u);if(!r.ok)throw new Error(r.status);const j=await r.json();showMsg('');
+    const r=await fetch(u,{headers:{'Accept':'application/json'}});if(!r.ok)throw new Error(r.status);const j=await r.json();showMsg('');
     return j.map(x=>{const p=x.display_name.split(',').map(s=>s.trim());return {name:((x.name||p[0])+(p[1]?' ('+p.slice(1,3).join(', ')+')':'')).slice(0,80),lat:+x.lat,lng:+x.lon}});
   }catch(e){showMsg(T('Pencarian alamat gagal (perlu internet).','Address search failed (internet required).'));return []}
 }
@@ -511,9 +511,17 @@ async function shareRoute(){
 }
 
 /* ===================== DATA: data.json, OSM (Overpass), ekspor ===================== */
-const OV_URL='https://overpass-api.de/api/interpreter';
+/* Multi-endpoint Overpass. Urutan = prioritas. Jika satu 502/503/504, coba berikutnya. */
+const OV_ENDPOINTS=[
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+];
 const OV_Q='[out:json][timeout:60];area["name"="Surabaya"]["boundary"="administrative"]->.a;(rel(area.a)["route"="bus"]["name"~"Suroboyo|Semanggi|Wira",i];rel(area.a)["route"="bus"]["network"~"Suroboyo|Semanggi|Wira",i];)->.r;.r out body;node(r.r);out body qt;way(r.r);out geom qt;';
+const OV_UA='SuroWay/1.0 (transit planner Surabaya; +https://github.com/)'; // ganti dengan URL repo/kontak Anda
+const OSM_CACHE_TTL=7*864e5; // 7 hari
 const PALETTE=['#dc2626','#2563eb','#7c3aed','#ea580c','#0891b2','#059669','#d97706','#db2777','#4f46e5','#65a30d'];
+
 function parseOSM(d){
   const nodes={},ways={},NS={},byRef={};
   d.elements.forEach(e=>{if(e.type==='node')nodes[e.id]=e;else if(e.type==='way'&&e.geometry)ways[e.id]=e});
@@ -556,20 +564,85 @@ function applyData(data,label){
   calculateRoutes(true);
 }
 const valid=d=>d&&d.ST&&Array.isArray(d.LINES)&&d.LINES.length&&d.LINES.every(l=>Array.isArray(l.stops)&&l.stops.length>1&&l.stops.every(s=>d.ST[s]));
-async function loadData(force){
-  if(!force){
-    try{const r=await fetch(CFG.dataUrl,{cache:'no-cache'});if(r.ok){const d=await r.json();if(valid(d)){applyData(d,'data.json');return}}}catch(e){}
-    const c=sget('suroway-osm',null);if(c&&Date.now()-c.t<864e5&&valid(c.data)){applyData(c.data,T('OSM (tersimpan)','OSM (cached)'));return}
-  }
-  setSrc(T('Memuat data dari OpenStreetMap… (bisa 10–40 detik)','Loading from OpenStreetMap… (10–40 s)'));
+
+/* Fetch satu endpoint Overpass. Lempar error jika HTTP tidak OK / timeout / jaringan gagal. */
+async function fetchOverpass(endpoint){
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),60000);
   try{
-    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),60000);
-    const res=await fetch(OV_URL,{method:'POST',body:'data='+encodeURIComponent(OV_Q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});
-    clearTimeout(to);if(!res.ok)throw new Error('HTTP '+res.status);
-    const data=parseOSM(await res.json());if(!valid(data))throw new Error(T('data kosong','empty data'));
-    sset('suroway-osm',{t:Date.now(),data});applyData(data,'OpenStreetMap');
-  }catch(e){setSrc(T('OSM tidak bisa dimuat (','OSM unavailable (')+e.message+T('). Memakai data bawaan (perkiraan).','). Using built-in estimated data.'),'text-amber-700')}
+    const res=await fetch(endpoint,{
+      method:'POST',
+      body:'data='+encodeURIComponent(OV_Q),
+      headers:{
+        'Content-Type':'application/x-www-form-urlencoded',
+        'Accept':'application/json',
+        'User-Agent':OV_UA,
+        'Referer':location.origin
+      },
+      signal:ctl.signal
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const j=await res.json();
+    if(j.remark&&/error|timeout/i.test(j.remark))throw new Error(j.remark.slice(0,80));
+    return j;
+  } finally { clearTimeout(to); }
 }
+
+/* Coba semua endpoint secara berurutan dengan backoff singkat antar percobaan. */
+async function fetchOverpassAll(){
+  let lastErr=null;
+  for(let i=0;i<OV_ENDPOINTS.length;i++){
+    const ep=OV_ENDPOINTS[i];
+    try{
+      const j=await fetchOverpass(ep);
+      return {json:j,host:new URL(ep).hostname};
+    }catch(e){
+      lastErr=e;
+      // backoff: 1s, 2s, 3s sebelum endpoint berikutnya
+      if(i<OV_ENDPOINTS.length-1)await new Promise(r=>setTimeout(r,1000*(i+1)));
+    }
+  }
+  throw lastErr||new Error('all endpoints failed');
+}
+
+async function loadData(force){
+  const cached=sget('suroway-osm',null);
+  const cacheFresh=cached&&(Date.now()-cached.t)<OSM_CACHE_TTL&&valid(cached.data);
+
+  // 1) Tanpa force: coba data.json dulu, lalu cache localStorage
+  if(!force){
+    try{
+      const r=await fetch(CFG.dataUrl,{cache:'no-cache'});
+      if(r.ok){const d=await r.json();if(valid(d)){applyData(d,'data.json');return}}
+    }catch(e){}
+    if(cacheFresh){applyData(cached.data,T('OSM (tersimpan)','OSM (cached)'));return}
+  }
+
+  // 2) Tampilkan data cache lama (jika ada) sambil memuat yang baru, agar UI tidak kosong
+  const hasStaleCache=cached&&valid(cached.data);
+  if(hasStaleCache&&force!==true){/* biarkan data saat ini tampil */}
+
+  setSrc(T('Memuat data dari OpenStreetMap… (bisa 10–40 detik)','Loading from OpenStreetMap… (10–40 s)'));
+
+  try{
+    const {json,host}=await fetchOverpassAll();
+    const data=parseOSM(json);
+    if(!valid(data))throw new Error(T('data kosong','empty data'));
+    sset('suroway-osm',{t:Date.now(),data,host});
+    applyData(data,'OpenStreetMap ('+host+')');
+  }catch(e){
+    // 3) Gagal total: pakai cache lama jika ada (walau kedaluwarsa), kalau tidak ada pakai data bawaan
+    if(hasStaleCache){
+      applyData(cached.data,T('OSM (tersimpan, lama)','OSM (cached, stale)'));
+      const ageH=Math.round((Date.now()-cached.t)/36e5);
+      setSrc(T('Gagal memperbarui dari OSM ('+e.message+'). Memakai data OSM terakhir (± '+ageH+' jam lalu).','Failed to refresh from OSM ('+e.message+'). Using last OSM data (~'+ageH+' h old).'),'text-amber-700');
+      toast(T('OSM tidak tersedia. Memakai data terakhir.','OSM unavailable. Using last cached data.'),5000);
+    }else{
+      setSrc(T('OSM tidak bisa dimuat ('+e.message+'). Memakai data bawaan (perkiraan).','OSM unavailable ('+e.message+'). Using built-in estimated data.'),'text-amber-700');
+      toast(T('OSM tidak tersedia. Memakai data bawaan.','OSM unavailable. Using built-in data.'),5000);
+    }
+  }
+}
+
 function exportData(){
   const blob=new Blob([JSON.stringify({ST,LINES,t:Date.now()})],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='data.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
@@ -617,9 +690,9 @@ function sendFeedback(){
 setTheme(sget('suroway-theme',window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')==='dark');
 if(sget('suroway-big',false))document.documentElement.classList.add('big');
 ['origin-input','destination-input'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')calculateRoutes()}));
-(function(){const q=new URLSearchParams(location.search);if(q.get('o'))$('origin-input').value=dec(q.get('o'));if(q.get('d'))$('destination-input').value=dec(q.get('d'))})();
+(function(){const q=new URLSearchParams(location.search);if(q.get('o'))$('origin-input').value=dec(q.get('o'));if(q.get('d'))$('destination-input').value=dec(q.get('d'));
+  const t=q.get('tab');if(t&&['planner','live','feeder','more'].includes(t))setTimeout(()=>switchTab(t),0);})();
 if(!new URLSearchParams(location.search).get('o')){const s=sget('suroway-last',null);if(s){$('origin-input').value=s[0];$('destination-input').value=s[1]}}
-$('plan-mode').addEventListener('change',()=>{});
 initBuses();initMap();refreshUI();renderChips();applyLang();switchTab('planner');
 setSrc(T('Data: bawaan (perkiraan)','Data: built-in (estimated)'),'text-amber-700');
 calculateRoutes(true).then(()=>loadData(false));
