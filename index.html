@@ -3,95 +3,206 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SuroWay – Smart Transit Planner Surabaya</title>
+<title>SuroWay – Rencana Perjalanan Cerdas Surabaya</title>
+<meta name="theme-color" content="#059669">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <style>
-:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-html,body{height:100%}
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;margin:0}
-::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
-#svgmap{width:100%;height:100%;z-index:1}
+html,body{height:100%;margin:0}
+html.big{font-size:112.5%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9}
+#map{width:100%;height:100%;z-index:1}
 .leaflet-tooltip.bus-tip{font-weight:700;font-size:10px;padding:1px 4px}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+/* mode gelap */
+html.dark{color-scheme:dark}
+html.dark body{background:#0b1220;color:#e2e8f0}
+html.dark .bg-white{background:#1e293b}
+html.dark .bg-slate-50{background:#0f172a}
+html.dark .bg-slate-100{background:#334155}
+html.dark .border-slate-100,html.dark .border-slate-200,html.dark .border-slate-300{border-color:#334155}
+html.dark .text-slate-800,html.dark .text-slate-700{color:#e2e8f0}
+html.dark .text-slate-600,html.dark .text-slate-500,html.dark .text-slate-400{color:#94a3b8}
+html.dark input,html.dark select,html.dark textarea{background:#0f172a;color:#e2e8f0;border-color:#475569}
+html.dark .bg-emerald-50,html.dark .bg-emerald-100{background:#064e3b}
+html.dark .bg-amber-50{background:#451a03}
+html.dark .text-emerald-700,html.dark .text-emerald-800{color:#6ee7b7}
+html.dark .text-amber-700,html.dark .text-amber-800{color:#fcd34d}
+html.dark .text-rose-700,html.dark .text-rose-600{color:#fda4af}
+html.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9)}
+html.dark .leaflet-control,html.dark .leaflet-bar a{background:#1e293b;color:#e2e8f0}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 </style>
 </head>
-<body class="h-full flex flex-col md:flex-row overflow-hidden">
+<body class="flex flex-col md:flex-row overflow-hidden">
 
-<div class="w-full md:w-[440px] bg-white flex flex-col h-[62%] md:h-full shadow-2xl z-10 flex-shrink-0 order-2 md:order-1">
-  <div class="p-3 bg-emerald-600 text-white flex items-center justify-between">
-    <div class="flex items-center gap-3">
+<div class="w-full md:w-[450px] bg-white flex flex-col h-[62%] md:h-full shadow-2xl z-10 flex-shrink-0 order-2 md:order-1">
+  <div class="p-3 bg-emerald-600 text-white flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <div class="bg-white/20 p-2 rounded-xl text-xl">🚌</div>
-      <div><h1 class="font-extrabold text-xl leading-none">SuroWay</h1><p class="text-xs text-emerald-100">Smart Transit Planner Surabaya</p></div>
+      <div class="min-w-0"><h1 class="font-extrabold text-xl leading-none">SuroWay</h1><p class="text-[11px] text-emerald-100 truncate">Rencana Perjalanan Cerdas Surabaya</p></div>
     </div>
-    <button onclick="openAssistant()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold">✨ Asisten Rute</button>
+    <div class="flex items-center gap-1 text-sm">
+      <button id="installBtn" onclick="doInstall()" class="hidden bg-white/20 rounded-lg px-2 py-1" title="Pasang aplikasi">📲</button>
+      <button onclick="toggleTheme()" class="bg-white/20 rounded-lg px-2 py-1" title="Mode gelap / Dark mode" aria-label="Mode gelap">🌓</button>
+      <button onclick="toggleSize()" class="bg-white/20 rounded-lg px-2 py-1 font-bold" title="Ukuran teks / Text size" aria-label="Ukuran teks">A+</button>
+      <button onclick="toggleLang()" id="langBtn" class="bg-white/20 rounded-lg px-2 py-1 font-bold" title="Bahasa / Language">EN</button>
+      <button onclick="openAssistant()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 px-2 py-1 rounded-lg text-xs font-bold" data-en="✨ Assistant">✨ Asisten</button>
+    </div>
   </div>
 
-  <div class="flex border-b border-slate-200 bg-slate-50 text-sm font-medium">
-    <button id="tab-planner" onclick="switchTab('planner')" class="flex-1 py-3">🧭 Cari Rute</button>
-    <button id="tab-live" onclick="switchTab('live')" class="flex-1 py-3">📡 Live & Crowd</button>
+  <div class="flex border-b border-slate-200 bg-slate-50 text-xs font-medium" role="tablist">
+    <button id="tab-planner" onclick="switchTab('planner')" class="flex-1 py-3" data-en="🧭 Route">🧭 Rute</button>
+    <button id="tab-live" onclick="switchTab('live')" class="flex-1 py-3" data-en="📡 Live">📡 Live</button>
     <button id="tab-feeder" onclick="switchTab('feeder')" class="flex-1 py-3">🚐 WiraWiri</button>
+    <button id="tab-more" onclick="switchTab('more')" class="flex-1 py-3" data-en="⚙️ More">⚙️ Lainnya</button>
   </div>
 
   <div class="flex-1 overflow-y-auto p-4 space-y-4">
+    <div id="trip" class="hidden bg-amber-400 text-slate-900 rounded-xl p-3 text-sm font-semibold flex items-center justify-between gap-2">
+      <span id="trip-msg"></span><button onclick="stopTrip()" class="bg-slate-900 text-white rounded-lg px-2 py-1 text-xs">✕</button>
+    </div>
+
     <div id="panel-planner" class="space-y-4">
       <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
         <datalist id="stoplist"></datalist>
         <div class="relative flex items-center">
           <span class="absolute left-3 text-emerald-600 text-sm">●</span>
-          <input id="origin-input" list="stoplist" value="Terminal Purabaya (Bungurasih)" class="w-full bg-white border border-slate-300 rounded-xl py-2 pl-8 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Asal perjalanan">
-          <button onclick="useCurrentLocation()" class="absolute right-2 p-1 text-slate-500 hover:text-emerald-600" title="Gunakan lokasi saat ini">📍</button>
+          <input id="origin-input" list="stoplist" autocomplete="off" value="Terminal Purabaya (Bungurasih)" class="w-full bg-white border border-slate-300 rounded-xl py-2 pl-8 pr-[4.5rem] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Asal / From" onfocus="lastField=this.id">
+          <div class="absolute right-1 flex">
+            <button onclick="addFav('origin-input')" class="p-1 text-slate-500" title="Simpan favorit / Save favorite">⭐</button>
+            <button onclick="useCurrentLocation()" class="p-1 text-slate-500" title="Lokasi saya / My location">📍</button>
+          </div>
         </div>
         <div class="relative flex items-center">
           <span class="absolute left-3 text-rose-500 text-sm">▼</span>
-          <input id="destination-input" list="stoplist" value="Tunjungan Plaza (TP)" class="w-full bg-white border border-slate-300 rounded-xl py-2 pl-8 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Tujuan perjalanan">
-          <button onclick="swapLocations()" class="absolute right-2 p-1 text-slate-500 hover:text-emerald-600" title="Tukar lokasi">⇅</button>
+          <input id="destination-input" list="stoplist" autocomplete="off" value="Tunjungan Plaza (TP)" class="w-full bg-white border border-slate-300 rounded-xl py-2 pl-8 pr-[4.5rem] text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Tujuan / To" onfocus="lastField=this.id">
+          <div class="absolute right-1 flex">
+            <button onclick="addFav('destination-input')" class="p-1 text-slate-500" title="Simpan favorit / Save favorite">⭐</button>
+            <button onclick="swapLocations()" class="p-1 text-slate-500" title="Tukar / Swap">⇅</button>
+          </div>
         </div>
+        <div id="geo" class="hidden space-y-1"></div>
+        <div id="chips" class="flex flex-wrap gap-1.5"></div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <select id="plan-mode" onchange="$('plan-time').classList.toggle('hidden',this.value==='now')" class="border border-slate-300 rounded-lg px-2 py-1.5 bg-white">
+            <option value="now">Berangkat sekarang</option><option value="dep">Berangkat pukul</option><option value="arr">Tiba pukul</option>
+          </select>
+          <input id="plan-time" type="time" value="07:00" class="hidden border border-slate-300 rounded-lg px-2 py-1 bg-white">
+        </div>
+
         <div class="flex items-center justify-between text-xs text-slate-600 font-medium">
-          <span>Moda:</span>
+          <span data-en="Modes:">Moda:</span>
           <div class="flex gap-3">
             <label class="inline-flex items-center gap-1"><input type="checkbox" id="pref-bus" checked class="accent-emerald-600">Bus</label>
             <label class="inline-flex items-center gap-1"><input type="checkbox" id="pref-feeder" checked class="accent-emerald-600">Feeder</label>
-            <label class="inline-flex items-center gap-1"><input type="checkbox" id="pref-ojek" checked class="accent-emerald-600">Ojek online</label>
+            <label class="inline-flex items-center gap-1"><input type="checkbox" id="pref-ojek" checked class="accent-emerald-600"><span data-en="Ride-hailing">Ojek online</span></label>
           </div>
         </div>
-        <button onclick="calculateRoutes()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm">🔍 Cari Rute Terbaik</button>
+        <details class="text-xs text-slate-600">
+          <summary class="cursor-pointer font-medium" data-en="More options">Opsi lainnya</summary>
+          <div class="pt-2 space-y-2">
+            <label class="flex items-center justify-between gap-2"><span data-en="Fare category (estimate)">Kategori tarif (perkiraan)</span>
+              <select id="fare-cat" class="border border-slate-300 rounded-lg px-2 py-1 bg-white"><option value="umum">Umum</option><option value="pelajar">Pelajar</option><option value="lansia">Lansia</option></select></label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="pref-wc" class="accent-emerald-600"><span data-en="Avoid stops marked not wheelchair-accessible (OSM data)">Hindari halte yang ditandai tidak ramah kursi roda (data OSM)</span></label>
+          </div>
+        </details>
+        <button onclick="calculateRoutes()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm" data-en="🔍 Find Best Route">🔍 Cari Rute Terbaik</button>
         <p id="msg" class="text-xs text-rose-600 hidden"></p>
       </div>
       <div id="route-results" class="space-y-3"></div>
-      <div class="text-[11px] text-slate-500 space-y-1"><p id="datasrc"></p><button onclick="loadOSM(true)" class="text-emerald-700 font-semibold underline">Muat ulang data halte dari OpenStreetMap</button><p class="text-slate-400">Tarif, jadwal, dan kepadatan masih perkiraan/simulasi. Posisi bus live memerlukan API resmi Dishub/GoBis.</p></div>
+      <div class="text-[11px] text-slate-500 space-y-1">
+        <p id="datasrc"></p>
+        <p class="text-slate-400" data-en="Fares, schedules, and crowd levels are estimates/simulations. Live bus positions need an official Dishub/GoBis API.">Tarif, jadwal, dan kepadatan masih perkiraan/simulasi. Posisi bus live memerlukan API resmi Dishub/GoBis.</p>
+      </div>
     </div>
 
     <div id="panel-live" class="space-y-3 hidden">
-      <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800">Posisi armada & kepadatan diperbarui tiap detik (simulasi). Klik kartu untuk menyorot bus di peta.</div>
+      <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800" data-en="Fleet positions and crowd levels are a SIMULATION. For real positions use the official GoBis Suroboyo app.">Posisi armada & kepadatan di tab ini adalah SIMULASI. Untuk posisi nyata, pakai aplikasi resmi GoBis Suroboyo.</div>
+      <div class="flex gap-2 text-xs">
+        <a class="flex-1 text-center bg-emerald-600 text-white rounded-lg py-2 font-semibold" target="_blank" rel="noopener" href="https://play.google.com/store/search?q=gobis%20suroboyo&c=apps">GoBis (Android)</a>
+        <a class="flex-1 text-center bg-slate-700 text-white rounded-lg py-2 font-semibold" target="_blank" rel="noopener" href="https://apps.apple.com/id/search?term=gobis%20suroboyo">GoBis (iOS)</a>
+      </div>
       <div id="live-list" class="space-y-3"></div>
     </div>
 
     <div id="panel-feeder" class="space-y-3 hidden">
-      <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs text-emerald-800">Feeder <strong>WiraWiri Suroboyo</strong> menghubungkan kawasan permukiman ke halte bus utama.</div>
+      <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs text-emerald-800" data-en="WiraWiri Suroboyo feeders connect neighborhoods to main bus stops.">Feeder <strong>WiraWiri Suroboyo</strong> menghubungkan kawasan permukiman ke halte bus utama.</div>
       <div id="feeder-list" class="space-y-3"></div>
+    </div>
+
+    <div id="panel-more" class="space-y-3 hidden">
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
+        <h3 class="font-bold text-slate-700" data-en="Data">Data</h3>
+        <p id="datasrc2" class="text-slate-500"></p>
+        <div class="flex gap-2">
+          <button onclick="loadData(true)" class="flex-1 bg-white border border-slate-300 rounded-lg py-2 font-semibold" data-en="🔄 Reload from OSM">🔄 Muat ulang dari OSM</button>
+          <button onclick="exportData()" class="flex-1 bg-white border border-slate-300 rounded-lg py-2 font-semibold" data-en="⬇️ Download data.json">⬇️ Unduh data.json</button>
+        </div>
+        <p class="text-slate-400" data-en="Upload data.json next to index.html to make the app load instantly and independently of the Overpass server.">Unggah data.json di samping index.html agar aplikasi memuat data seketika tanpa bergantung pada server Overpass.</p>
+      </div>
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
+        <h3 class="font-bold text-slate-700" data-en="Report a problem">Laporkan masalah</h3>
+        <select id="fb-type" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white"><option value="Halte salah / hilang">Halte salah / hilang</option><option value="Rute / jadwal berbeda">Rute / jadwal berbeda</option><option value="Bug aplikasi">Bug aplikasi</option><option value="Saran">Saran</option></select>
+        <textarea id="fb-text" rows="3" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white" placeholder="Jelaskan singkat / Describe briefly"></textarea>
+        <button onclick="sendFeedback()" class="w-full bg-emerald-600 text-white rounded-lg py-2 font-semibold" data-en="Send report">Kirim laporan</button>
+      </div>
+      <div class="text-[11px] text-slate-400 space-y-1">
+        <p>Peta © OpenStreetMap contributors. Data rute dari OSM bergantung pada kelengkapan komunitas pemeta.</p>
+        <p><a class="underline" target="_blank" rel="noopener" href="https://dishub.surabaya.go.id">dishub.surabaya.go.id</a></p>
+      </div>
     </div>
   </div>
 </div>
 
 <div class="flex-1 relative order-1 md:order-2 h-[38%] md:h-full">
-  <div id="svgmap"></div>
-  <div class="absolute top-2 left-12 z-[500] bg-white/90 rounded-lg px-2 py-1 text-[11px] text-slate-600 shadow">Klik halte di peta: pertama = asal, berikutnya = tujuan</div>
-  <div id="legend" class="absolute bottom-6 left-2 z-[500] bg-white/90 rounded-lg px-2 py-1 text-[11px] flex gap-3 shadow"></div>
+  <div id="map"></div>
+  <div class="absolute top-2 left-12 z-[500] bg-white/90 text-slate-700 rounded-lg px-2 py-1 text-[11px] shadow" data-en="Tap a stop: first = origin, next = destination">Klik halte: pertama = asal, berikutnya = tujuan</div>
+  <div id="legend" class="absolute bottom-6 left-2 z-[500] bg-white/90 text-slate-700 rounded-lg px-2 py-1 text-[11px] flex flex-wrap gap-x-3 shadow max-w-[80%]"></div>
 </div>
 
-<div id="modal" class="fixed inset-0 bg-black/40 z-50 hidden items-center justify-center p-4">
+<div id="modal" class="fixed inset-0 bg-black/40 z-[1000] hidden items-center justify-center p-4">
   <div class="bg-white rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-2xl">
-    <h3 class="font-bold text-slate-800">✨ Asisten Rute</h3>
+    <h3 class="font-bold text-slate-800" id="modal-title"></h3>
     <div id="modal-body" class="text-sm text-slate-700 space-y-2"></div>
-    <button onclick="$('modal').classList.add('hidden');$('modal').classList.remove('flex')" class="w-full bg-slate-800 text-white rounded-xl py-2 text-sm font-semibold">Tutup</button>
+    <button onclick="closeModal()" class="w-full bg-slate-800 text-white rounded-xl py-2 text-sm font-semibold">OK</button>
   </div>
 </div>
+<div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm rounded-xl px-4 py-2 z-[1100] hidden max-w-[90%] text-center"></div>
 
 <script>
-/* ============ DATA (ubah di sini) ============ */
-/* Data bawaan = PERKIRAAN koordinat & urutan halte (cadangan jika OSM gagal dimuat).
-   Data asli dimuat dari OpenStreetMap saat aplikasi dibuka. Tarif/headway = perkiraan. */
+/* ===================== KONFIGURASI ===================== */
+const CFG={
+  feedbackEmail:'',   // isi email penerima laporan, mis. 'nama@domain.id'
+  feedbackWA:'',      // atau nomor WhatsApp format 628xxxxxxxxxx
+  dataUrl:'data.json' // berkas data statis (opsional) di samping index.html
+};
+const FARE_CAT={umum:1,pelajar:0.5,lansia:0.5}; // PERKIRAAN, sesuaikan dengan tarif resmi Dishub
+const WALK_KMH=4.5,OJEK_KMH=25,OJEK_WAIT=4;
+const ojekFare=km=>Math.max(8000,3000*km);
+
+/* ===================== UTIL ===================== */
+const $=id=>document.getElementById(id);
+const sget=(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}};
+const sset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let LANG=sget('suroway-lang','id');
+const T=(a,b)=>LANG==='en'?b:a;
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rp=n=>'Rp '+(Math.round(n/500)*500).toLocaleString('id-ID');
+const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+const ll=s=>[ST[s][1],ST[s][2]];
+const hhmm=d=>d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}).replace('.',':');
+function toast(t,ms){const e=$('toast');e.textContent=t;e.classList.remove('hidden');clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.add('hidden'),ms||3000)}
+function showMsg(t,info){const m=$('msg');m.textContent=t;m.className='text-xs '+(info?'text-slate-500':'text-rose-600')+(t?'':' hidden')}
+function openModal(title,html){$('modal-title').textContent=title;$('modal-body').innerHTML=html;$('modal').classList.remove('hidden');$('modal').classList.add('flex')}
+function closeModal(){$('modal').classList.add('hidden');$('modal').classList.remove('flex')}
+
+/* ===================== DATA BAWAAN (PERKIRAAN, cadangan) ===================== */
 let ST={
 pur:['Terminal Purabaya (Bungurasih)',-7.3507,112.7253],
 wono:['Halte DTC Wonokromo',-7.302165,112.738093],
@@ -119,36 +230,31 @@ let LINES=[
 {id:'R5',name:'Suroboyo Bus R5 (Benowo–Tunjungan)',type:'bus',color:'#0891b2',headway:15,speed:28,fare:5000,stops:['benowo','tp']},
 {id:'SBT',name:'Suroboyo Bus SBT (Purabaya–Tugu Pahlawan)',type:'bus',color:'#ea580c',headway:20,speed:22,fare:5000,stops:['pur','wono','joyo','tugu']},
 {id:'TS2',name:'Trans Semanggi R2 (Lidah Wetan–Kejawan Putih Tambak)',type:'bus',color:'#2563eb',headway:15,speed:24,fare:5000,stops:['lidah','karang','its','kejawan']}];
-const WALK_KMH=4.5,OJEK_KMH=25,OJEK_WAIT=4;
-const ojekFare=km=>Math.max(8000,3000*km);
-/* ============================================= */
-const $=id=>document.getElementById(id);
 let LN={};const rebuildLN=()=>{LN={};LINES.forEach(l=>LN[l.id]=l)};rebuildLN();
-const rp=n=>'Rp '+(Math.round(n/500)*500).toLocaleString('id-ID');
-const hav=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
-const ll=s=>[ST[s][1],ST[s][2]];
-const proj=p=>[20+(p[1]-112.66)/0.30*560,20+(-7.23-p[0])/0.15*600];
-let me=null,results=[],sel=-1,pickToggle=0;
 
-/* ---------- Kepadatan (simulasi, bergantung jam) ---------- */
-function crowd(id){
-  const d=new Date(),h=d.getHours()+d.getMinutes()/60,idx=LINES.findIndex(l=>l.id===id);
+let me=null,results=[],sel=-1,pickToggle=0,lastField='destination-input',places={},plan={mode:'now',date:new Date()},baseDate=new Date(),dataSrc='bawaan';
+
+/* ===================== KEPADATAN (simulasi) ===================== */
+function crowd(id,d){
+  d=d||baseDate;const h=d.getHours()+d.getMinutes()/60,idx=Math.max(0,LINES.findIndex(l=>l.id===id));
   const rush=(h>=6.5&&h<=9)||(h>=16&&h<=19)?0.68:(h>=10&&h<=15?0.45:0.28);
   const v=rush+0.14*Math.sin(d.getMinutes()/6+idx*2.1)+(idx%3-1)*0.05;
   return Math.round(Math.min(0.97,Math.max(0.15,v))*100);
 }
-const crowdInfo=p=>p<45?['Lega','text-emerald-700','bg-emerald-500']:p<75?['Sedang','text-amber-700','bg-amber-500']:['Padat','text-rose-700','bg-rose-500'];
+const crowdInfo=p=>p<45?[T('Lega','Quiet'),'text-emerald-700','bg-emerald-500']:p<75?[T('Sedang','Moderate'),'text-amber-700','bg-amber-500']:[T('Padat','Crowded'),'text-rose-700','bg-rose-500'];
 
-/* ---------- Routing: Dijkstra (stop,line) ---------- */
-function dijk(from,to,types,pen){
+/* ===================== ROUTING ===================== */
+function dijk(from,to,types,pen,wc){
   if(from===to)return null;
+  const bad=s=>wc&&ST[s][3]==='no';
+  if(bad(from)||bad(to))return null;
   const D={},P={},Q=[[0,from+'|*']];D[from+'|*']=0;const end=to+'|*';
   while(Q.length){
     Q.sort((a,b)=>a[0]-b[0]);const [c,k]=Q.shift();if(c>D[k])continue;if(k===end)break;
     const [s,l]=k.split('|'),nb=[];
     if(l==='*'){LINES.filter(x=>types.includes(x.type)&&x.stops.includes(s)).forEach(x=>nb.push([s+'|'+x.id,x.headway/2+(s===from?0:pen)]));}
     else{const x=LN[l],i=x.stops.indexOf(s);nb.push([s+'|*',0.5]);
-      [i-1,i+1].forEach(j=>{const t=x.stops[j];if(t)nb.push([t+'|'+l,hav(ll(s),ll(t))/x.speed*60+0.7])});}
+      [i-1,i+1].forEach(j=>{const t=x.stops[j];if(t&&!bad(t))nb.push([t+'|'+l,hav(ll(s),ll(t))/x.speed*60+0.7])});}
     nb.forEach(([n,w])=>{if(D[n]===undefined||c+w<D[n]){D[n]=c+w;P[n]=k;Q.push([c+w,n])}});
   }
   if(D[end]===undefined)return null;
@@ -158,19 +264,17 @@ function dijk(from,to,types,pen){
   return {legs,min:D[end]};
 }
 function nearest(p){let b=null,bd=1e9;for(const s in ST){const d=hav([p.lat,p.lng],ll(s));if(d<bd){bd=d;b=s}}return [b,bd]}
-
 function access(p,allowOjek){
-  let stop,d=0;
-  if(p.stop)stop=p.stop;else [stop,d]=nearest(p);
+  let stop,d=0;if(p.stop)stop=p.stop;else [stop,d]=nearest(p);
   if(d===0)return {stop,kind:'none',km:0,min:0,cost:0};
   if(d<=1.2||!allowOjek)return {stop,kind:'walk',km:d,min:d/WALK_KMH*60,cost:0};
   return {stop,kind:'ojek',km:d*1.3,min:d*1.3/OJEK_KMH*60+OJEK_WAIT,cost:ojekFare(d*1.3)};
 }
-function build(a,b,types,pen,allowOjek){
+function build(a,b,types,pen,allowOjek,wc,mult){
   const A=access(a,allowOjek),B=access(b,allowOjek);
-  const r=dijk(A.stop,B.stop,types,pen);if(!r)return null;
+  const r=dijk(A.stop,B.stop,types,pen,wc);if(!r)return null;
   let km=A.km+B.km,cost=A.cost+B.cost;
-  r.legs.forEach(L=>{for(let i=1;i<L.stops.length;i++)km+=hav(ll(L.stops[i-1]),ll(L.stops[i]));cost+=LN[L.line].fare});
+  r.legs.forEach(L=>{for(let i=1;i<L.stops.length;i++)km+=hav(ll(L.stops[i-1]),ll(L.stops[i]));cost+=LN[L.line].fare*mult});
   const cr=Math.max(0,...r.legs.map(L=>crowd(L.line)));
   return {kind:'transit',A,B,legs:r.legs,min:Math.round(A.min+B.min+r.min),km,cost,crowd:cr,sig:r.legs.map(l=>l.line).join('>')+A.kind+B.kind,a,b};
 }
@@ -179,222 +283,347 @@ function ojekDirect(a,b){
   return {kind:'ojek',min:Math.round(km/OJEK_KMH*60+OJEK_WAIT),km,cost:ojekFare(km),crowd:null,sig:'ojek',a,b,legs:[]};
 }
 
-/* ---------- Lokasi ---------- */
+/* ===================== LOKASI, FAVORIT, GEOCODING ===================== */
+let favs=sget('suroway-fav',[]),hist=sget('suroway-hist',[]);
 function resolve(text){
-  const t=text.trim().toLowerCase();if(!t)return null;
-  if(t==='lokasi saya'&&me)return {name:'Lokasi Saya',lat:me[0],lng:me[1]};
-  let id=Object.keys(ST).find(s=>ST[s][0].toLowerCase()===t)||Object.keys(ST).find(s=>ST[s][0].toLowerCase().includes(t));
+  const t=(text||'').trim().toLowerCase();if(!t)return null;
+  if(t==='lokasi saya'||t==='my location'){return me?{name:'Lokasi Saya',lat:me[0],lng:me[1]}:null}
+  const f=favs.find(x=>x.label.toLowerCase()===t);if(f)return {name:f.label,lat:f.lat,lng:f.lng,stop:f.stop};
+  if(places[t])return places[t];
+  const ids=Object.keys(ST);
+  const id=ids.find(s=>ST[s][0].toLowerCase()===t)||ids.find(s=>ST[s][0].toLowerCase().includes(t));
   return id?{name:ST[id][0],lat:ST[id][1],lng:ST[id][2],stop:id}:null;
 }
 function useCurrentLocation(){
-  if(!navigator.geolocation)return showMsg('Browser tidak mendukung GPS.');
-  showMsg('Mencari lokasi…',true);
-  navigator.geolocation.getCurrentPosition(p=>{me=[p.coords.latitude,p.coords.longitude];$('origin-input').value='Lokasi Saya';showMsg('');drawMap();},
-    ()=>showMsg('Lokasi tidak bisa diakses. Izinkan akses lokasi atau pilih halte manual.'),{timeout:10000});
+  if(!navigator.geolocation)return showMsg(T('Browser tidak mendukung GPS.','GPS not supported.'));
+  showMsg(T('Mencari lokasi…','Locating…'),true);
+  navigator.geolocation.getCurrentPosition(p=>{me=[p.coords.latitude,p.coords.longitude];$('origin-input').value='Lokasi Saya';showMsg('');drawMe();if(map)map.setView(me,14)},
+    ()=>showMsg(T('Lokasi tidak bisa diakses. Izinkan akses lokasi (perlu https) atau pilih halte manual.','Location unavailable. Allow location access (https required) or pick a stop.')),{timeout:10000});
 }
-function swapLocations(){const o=$('origin-input'),d=$('destination-input'),t=o.value;o.value=d.value;d.value=t;}
-function showMsg(t,info){const m=$('msg');m.textContent=t;m.className='text-xs '+(info?'text-slate-500':'text-rose-600')+(t?'':' hidden');}
+function swapLocations(){const o=$('origin-input'),d=$('destination-input'),t=o.value;o.value=d.value;d.value=t}
+async function geocode(q){
+  showMsg(T('Mencari alamat…','Searching address…'),true);
+  try{
+    const u='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=id&bounded=1&viewbox=112.55,-7.10,112.90,-7.45&accept-language='+LANG+'&q='+encodeURIComponent(q);
+    const r=await fetch(u);if(!r.ok)throw new Error(r.status);const j=await r.json();showMsg('');
+    return j.map(x=>{const p=x.display_name.split(',').map(s=>s.trim());return {name:((x.name||p[0])+(p[1]?' ('+p.slice(1,3).join(', ')+')':'')).slice(0,80),lat:+x.lat,lng:+x.lon}});
+  }catch(e){showMsg(T('Pencarian alamat gagal (perlu internet).','Address search failed (internet required).'));return []}
+}
+function showGeo(fieldId,list){
+  const g=$('geo');g.classList.remove('hidden');
+  g.innerHTML='<p class="text-xs text-slate-500">'+T('Pilih lokasi yang dimaksud:','Choose the intended place:')+'</p>'+list.map((p,i)=>`<button class="w-full text-left text-xs bg-white border border-slate-300 rounded-lg px-2 py-1.5" data-i="${i}">📌 ${esc(p.name)}</button>`).join('');
+  g.querySelectorAll('button').forEach(b=>b.onclick=()=>{const p=list[+b.dataset.i];places[p.name.toLowerCase()]=p;$(fieldId).value=p.name;g.classList.add('hidden');calculateRoutes()});
+}
+async function ensure(el,auto){
+  const v=el.value.trim();let p=resolve(v);if(p)return p;
+  if(!v||auto)return null;
+  if(v.toLowerCase()==='lokasi saya'||v.toLowerCase()==='my location'){showMsg(T('Tekan 📍 dulu untuk mengambil lokasi.','Press 📍 first to get your location.'));return null}
+  const list=await geocode(v);
+  if(!list.length){if(!$('msg').textContent)showMsg(T('Lokasi "'+v+'" tidak ditemukan.','Location "'+v+'" not found.'));return null}
+  showGeo(el.id,list);return 'pending';
+}
+function addFav(fieldId){
+  const p=resolve($(fieldId).value);if(!p||p.name==='Lokasi Saya')return toast(T('Pilih lokasi yang valid dulu.','Pick a valid place first.'));
+  const label=(prompt(T('Nama favorit (mis. Rumah, Sekolah, Kantor):','Favorite name (e.g. Home, School, Work):'),p.name)||'').trim();
+  if(!label)return;
+  favs=favs.filter(f=>f.label.toLowerCase()!==label.toLowerCase());favs.push({label,lat:p.lat,lng:p.lng,stop:p.stop});sset('suroway-fav',favs);
+  $(fieldId).value=label;renderChips();refreshUI();toast('⭐ '+label);
+}
+function renderChips(){
+  const f=favs.map((x,i)=>`<span class="inline-flex items-center bg-amber-100 text-amber-800 rounded-full text-xs overflow-hidden"><button class="px-2 py-1" onclick="fillField(${i})">⭐ ${esc(x.label)}</button><button class="pr-2 text-amber-700" onclick="delFav(${i})" aria-label="hapus">×</button></span>`).join('');
+  const h=hist.map((x,i)=>`<button class="bg-slate-100 text-slate-600 rounded-full px-2 py-1 text-xs" onclick="useHist(${i})">🕘 ${esc(x[0].split(' (')[0])} → ${esc(x[1].split(' (')[0])}</button>`).join('');
+  $('chips').innerHTML=f+h;
+}
+function fillField(i){$(lastField).value=favs[i].label}
+function delFav(i){favs.splice(i,1);sset('suroway-fav',favs);renderChips();refreshUI()}
+function useHist(i){$('origin-input').value=hist[i][0];$('destination-input').value=hist[i][1];calculateRoutes()}
 
-/* ---------- Hitung & tampil ---------- */
-function calculateRoutes(){
-  const a=resolve($('origin-input').value),b=resolve($('destination-input').value);
-  if(!a)return showMsg('Asal tidak dikenali. Pilih dari daftar halte atau gunakan tombol 📍.');
-  if(!b)return showMsg('Tujuan tidak dikenali. Pilih dari daftar halte.');
-  const bus=$('pref-bus').checked,fd=$('pref-feeder').checked,oj=$('pref-ojek').checked;
-  if(!bus&&!fd&&!oj)return showMsg('Pilih minimal satu moda transportasi.');
-  showMsg('');
-  try{localStorage.setItem('suroway',JSON.stringify([$('origin-input').value,$('destination-input').value]))}catch(e){}
+/* ===================== HITUNG & TAMPIL ===================== */
+function readPlan(){
+  const mode=$('plan-mode').value,now=new Date();let date=now;
+  if(mode!=='now'){const [h,m]=($('plan-time').value||'07:00').split(':').map(Number);date=new Date();date.setHours(h,m,0,0);if(mode==='dep'&&date<now-6e4)date.setDate(date.getDate()+1);}
+  plan={mode,date};
+  baseDate=mode==='arr'?new Date(date.getTime()-30*6e4):date;
+}
+async function calculateRoutes(auto){
+  closeGeo();
+  const oEl=$('origin-input'),dEl=$('destination-input');
+  const a=await ensure(oEl,auto);if(!a||a==='pending')return;
+  const b=await ensure(dEl,auto);if(!b||b==='pending')return;
+  const bus=$('pref-bus').checked,fd=$('pref-feeder').checked,oj=$('pref-ojek').checked,wc=$('pref-wc').checked;
+  if(!bus&&!fd&&!oj)return showMsg(T('Pilih minimal satu moda transportasi.','Select at least one mode.'));
+  showMsg('');readPlan();
+  const mult=FARE_CAT[$('fare-cat').value]||1;
   const types=[bus&&'bus',fd&&'feeder'].filter(Boolean);
   let list=[];
   if(types.length){
     [[types,0],[types,8],[types.filter(t=>t==='bus'),4],[types.filter(t=>t==='feeder'),4]].forEach(([ty,pen])=>{
-      if(!ty.length)return;const r=build(a,b,ty,pen,oj);if(r&&!list.some(x=>x.sig===r.sig))list.push(r);});
+      if(!ty.length)return;const r=build(a,b,ty,pen,oj,wc,mult);if(r&&!list.some(x=>x.sig===r.sig))list.push(r)});
   }
   if(oj)list.push(ojekDirect(a,b));
-  if(!list.length)return showMsg('Tidak ada rute dengan moda yang dipilih. Coba aktifkan moda lain.');
+  if(!list.length)return showMsg(T('Tidak ada rute dengan pilihan moda ini. Coba aktifkan moda lain.','No route with these modes. Try enabling more.'));
+  if(!auto){hist=hist.filter(x=>!(x[0]===oEl.value&&x[1]===dEl.value));hist.unshift([oEl.value,dEl.value]);hist=hist.slice(0,4);sset('suroway-hist',hist);renderChips()}
   list.sort((x,y)=>x.min-y.min);results=list;sel=0;renderResults();drawMap();
 }
-function legBadge(L){const l=LN[L.line];return `<span class="px-2 py-0.5 rounded-md text-white text-xs font-bold" style="background:${l.color}">${l.type==='bus'?'🚌':'🚐'} ${l.id}</span>`}
-function accIcon(A){return A.kind==='walk'?`<span>🚶 ${Math.max(1,Math.round(A.min))} mnt</span>`:A.kind==='ojek'?`<span class="text-amber-700">🏍️ ${Math.round(A.min)} mnt</span>`:''}
+function closeGeo(){$('geo').classList.add('hidden')}
+const legBadge=L=>{const l=LN[L.line];return `<span class="px-2 py-0.5 rounded-md text-white text-xs font-bold" style="background:${l.color}">${l.type==='bus'?'🚌':'🚐'} ${esc(l.id)}</span>`};
+const accIcon=A=>A.kind==='walk'?`<span>🚶 ${Math.max(1,Math.round(A.min))} ${T('mnt','min')}</span>`:A.kind==='ojek'?`<span class="text-amber-700">🏍️ ${Math.round(A.min)} ${T('mnt','min')}</span>`:'';
 function renderResults(){
+  if(!results.length){$('route-results').innerHTML='';return}
   const minT=Math.min(...results.map(r=>r.min)),minC=Math.min(...results.map(r=>r.cost));
   const cr=results.filter(r=>r.crowd!==null).map(r=>r.crowd),minCr=cr.length?Math.min(...cr):null;
-  $('route-results').innerHTML='<h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Opsi perjalanan</h2>'+results.map((r,i)=>{
-    const eta=new Date(Date.now()+r.min*60000).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}).replace('.',':');
-    const tags=[r.min===minT&&'Tercepat',r.cost===minC&&'Termurah',r.crowd!==null&&r.crowd===minCr&&'Paling lega'].filter(Boolean).map(t=>`<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">${t}</span>`).join(' ');
-    const segs=r.kind==='ojek'?'<span class="text-amber-700">🏍️ Ojek online langsung</span>':
-      [accIcon(r.A),...r.legs.map(legBadge),accIcon(r.B)].filter(Boolean).join(' <span class="text-slate-300">›</span> ');
-    let cw='';if(r.crowd!==null){const c=crowdInfo(r.crowd);cw=`<div class="flex justify-between text-xs pt-2 border-t border-slate-100"><span class="text-slate-500">Kepadatan tertinggi:</span><span class="font-semibold ${c[1]}">${c[0]} (${r.crowd}%)</span></div>`}
-    return `<div onclick="selectRoute(${i})" class="bg-white rounded-2xl p-4 shadow-sm cursor-pointer transition ${i===sel?'border-2 border-emerald-500':'border border-slate-200 hover:shadow-md'}">
+  $('route-results').innerHTML='<h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">'+T('Opsi perjalanan','Trip options')+'</h2>'+results.map((r,i)=>{
+    const tags=[r.min===minT&&T('Tercepat','Fastest'),r.cost===minC&&T('Termurah','Cheapest'),r.crowd!==null&&r.crowd===minCr&&T('Paling lega','Quietest')].filter(Boolean).map(t=>`<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">${t}</span>`).join(' ');
+    const segs=r.kind==='ojek'?'<span class="text-amber-700">🏍️ '+T('Ojek online langsung','Direct ride-hailing')+'</span>':[accIcon(r.A),...r.legs.map(legBadge),accIcon(r.B)].filter(Boolean).join(' <span class="text-slate-300">›</span> ');
+    let timeTxt;
+    if(plan.mode==='arr')timeTxt=T('Berangkat paling lambat ','Leave by ')+'<b>'+hhmm(new Date(plan.date.getTime()-r.min*6e4))+'</b>';
+    else timeTxt=T('Estimasi tiba: ','Arrive about: ')+'<b>'+hhmm(new Date(plan.date.getTime()+r.min*6e4))+'</b>';
+    let cw='';if(r.crowd!==null){const c=crowdInfo(r.crowd);cw=`<div class="flex justify-between text-xs pt-2 border-t border-slate-100"><span class="text-slate-500">${T('Kepadatan tertinggi:','Peak crowding:')}</span><span class="font-semibold ${c[1]}">${c[0]} (${r.crowd}%)</span></div>`}
+    return `<div onclick="selectRoute(${i})" class="bg-white rounded-2xl p-4 shadow-sm cursor-pointer ${i===sel?'border-2 border-emerald-500':'border border-slate-200'}">
       <div class="flex justify-between items-start">
-        <div><div class="flex items-center gap-2"><span class="text-lg font-bold text-slate-800">${r.min} Menit</span><span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">${r.km.toFixed(1)} km</span></div>
-        <div class="text-xs text-slate-500">Estimasi tiba: <b class="text-slate-700">${eta} WIB</b></div></div>
-        <div class="text-right"><div class="text-sm font-bold text-emerald-600">${rp(r.cost)}</div><div class="text-[11px] text-slate-400">Total biaya</div></div>
+        <div><div class="flex items-center gap-2"><span class="text-lg font-bold text-slate-800">${r.min} ${T('Menit','min')}</span><span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">${r.km.toFixed(1)} km</span></div>
+        <div class="text-xs text-slate-500">${timeTxt}</div></div>
+        <div class="text-right"><div class="text-sm font-bold text-emerald-600">${rp(r.cost)}</div><div class="text-[11px] text-slate-400">${T('Total biaya','Total cost')}</div></div>
       </div>
       <div class="flex flex-wrap items-center gap-1.5 my-3 py-2 px-3 bg-slate-50 rounded-xl text-xs font-semibold text-slate-700">${segs}</div>
       <div class="flex flex-wrap gap-1">${tags}</div>${cw}
-      ${i===sel?`<div class="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-700 space-y-1.5">${steps(r)}</div>`:''}
+      ${i===sel?`<div class="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-700 space-y-1.5">${steps(r)}
+        <div class="flex gap-2 pt-2"><button onclick="event.stopPropagation();shareRoute()" class="flex-1 bg-slate-100 text-slate-700 rounded-lg py-2 font-semibold">🔗 ${T('Bagikan','Share')}</button>${r.kind==='transit'?`<button onclick="event.stopPropagation();startTrip()" class="flex-1 bg-emerald-600 text-white rounded-lg py-2 font-semibold">⏰ ${T('Alarm turun','Stop alarm')}</button>`:''}</div></div>`:''}
     </div>`}).join('');
 }
 function steps(r){
-  if(r.kind==='ojek')return `<div>🏍️ Ojek online dari <b>${r.a.name}</b> ke <b>${r.b.name}</b> (${r.km.toFixed(1)} km)</div>`;
+  if(r.kind==='ojek')return `<div>🏍️ ${T('Ojek online dari','Ride-hailing from')} <b>${esc(r.a.name)}</b> ${T('ke','to')} <b>${esc(r.b.name)}</b> (${r.km.toFixed(1)} km)</div>`;
   const o=[];
-  const acc=(A,p,from)=>{if(A.kind==='none')return;const verb=A.kind==='walk'?'🚶 Jalan kaki':'🏍️ Ojek online';
-    o.push(from?`<div>${verb} ${A.km.toFixed(1)} km dari <b>${p.name}</b> ke <b>${ST[A.stop][0]}</b></div>`:`<div>${verb} ${A.km.toFixed(1)} km dari <b>${ST[A.stop][0]}</b> ke <b>${p.name}</b></div>`)};
+  const acc=(A,p,from)=>{if(A.kind==='none')return;const verb=A.kind==='walk'?'🚶 '+T('Jalan kaki','Walk'):'🏍️ '+T('Ojek online','Ride-hailing');
+    o.push(from?`<div>${verb} ${A.km.toFixed(1)} km ${T('dari','from')} <b>${esc(p.name)}</b> ${T('ke','to')} <b>${esc(ST[A.stop][0])}</b></div>`:`<div>${verb} ${A.km.toFixed(1)} km ${T('dari','from')} <b>${esc(ST[A.stop][0])}</b> ${T('ke','to')} <b>${esc(p.name)}</b></div>`)};
   acc(r.A,r.a,true);
-  r.legs.forEach(L=>{const l=LN[L.line];o.push(`<div>${l.type==='bus'?'🚌':'🚐'} Naik <b>${l.name}</b> di <b>${ST[L.stops[0]][0]}</b>, turun di <b>${ST[L.stops[L.stops.length-1]][0]}</b> (${L.stops.length-1} halte, tunggu ± ${Math.round(l.headway/2)} mnt)</div>`)});
+  r.legs.forEach(L=>{const l=LN[L.line],w=L.stops.some(s=>ST[s][3]==='no')?' ⚠️♿':'';
+    o.push(`<div>${l.type==='bus'?'🚌':'🚐'} ${T('Naik','Board')} <b>${esc(l.name)}</b> ${T('di','at')} <b>${esc(ST[L.stops[0]][0])}</b>, ${T('turun di','get off at')} <b>${esc(ST[L.stops[L.stops.length-1]][0])}</b> (${L.stops.length-1} ${T('halte','stops')}, ${T('tunggu ±','wait ~')}${Math.round(l.headway/2)} ${T('mnt','min')})${w}</div>`)});
   acc(r.B,r.b,false);return o.join('');
 }
-function selectRoute(i){sel=i;renderResults();drawMap();}
+function selectRoute(i){sel=i;renderResults();drawMap()}
 
-/* ---------- Peta Leaflet + OpenStreetMap ---------- */
-let map,baseLayer,routeLayer,busLayer;
+/* ===================== PETA (Leaflet + OSM) ===================== */
+let map,baseLayer,routeLayer,busLayer,meLayer;
 function initMap(){
-  map=L.map('svgmap').setView([-7.28,112.74],12);
+  map=L.map('map').setView([-7.28,112.74],12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-  baseLayer=L.layerGroup().addTo(map);routeLayer=L.layerGroup().addTo(map);busLayer=L.layerGroup().addTo(map);
+  baseLayer=L.layerGroup().addTo(map);routeLayer=L.layerGroup().addTo(map);busLayer=L.layerGroup().addTo(map);meLayer=L.layerGroup().addTo(map);
   setTimeout(()=>map.invalidateSize(),300);window.addEventListener('resize',()=>map.invalidateSize());
 }
 const pin=(c,t)=>L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],html:`<div style="width:26px;height:26px;border-radius:50%;background:${c};color:#fff;border:2px solid #fff;font:700 12px system-ui;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px #0006">${t}</div>`});
+function legGeom(L_){
+  const line=LN[L_.line],pts=L_.stops.map(ll);if(!line.geom)return [pts];
+  const la=pts.map(p=>p[0]),lo=pts.map(p=>p[1]),pad=.002,b=[Math.min(...la)-pad,Math.max(...la)+pad,Math.min(...lo)-pad,Math.max(...lo)+pad];
+  const inb=p=>p[0]>=b[0]&&p[0]<=b[1]&&p[1]>=b[2]&&p[1]<=b[3],out=[];
+  line.geom.forEach(w=>{let cur=[];w.forEach(p=>{if(inb(p))cur.push(p);else{if(cur.length>1)out.push(cur);cur=[]}});if(cur.length>1)out.push(cur)});
+  return out.length?out:[pts];
+}
 function drawMap(){
+  if(!map)return;
   baseLayer.clearLayers();routeLayer.clearLayers();
   const r=results[sel];
-  LINES.forEach(l=>L.polyline(l.stops.map(ll),{color:l.color,weight:4,opacity:r?.25:.65,dashArray:l.type==='feeder'?'6 6':null}).addTo(baseLayer));
+  LINES.forEach(l=>{const op={color:l.color,weight:4,opacity:r?.25:.65,dashArray:l.type==='feeder'?'6 6':null};
+    (l.geom?l.geom:[l.stops.map(ll)]).forEach(p=>L.polyline(p,op).addTo(baseLayer))});
   for(const id in ST){
-    L.circleMarker(ll(id),{radius:6,color:'#334155',weight:2,fillColor:'#fff',fillOpacity:1})
-      .bindTooltip(ST[id][0]).on('click',()=>pickStop(id)).addTo(baseLayer);
+    const w=ST[id][3]==='yes'?' ♿':ST[id][3]==='no'?' ⛔♿':'';
+    L.circleMarker(ll(id),{radius:6,color:'#334155',weight:2,fillColor:'#fff',fillOpacity:1}).bindTooltip(ST[id][0]+w).on('click',()=>pickStop(id)).addTo(baseLayer);
   }
   let pts=[];
-  if(r&&r.kind==='ojek'){
-    const p=[[r.a.lat,r.a.lng],[r.b.lat,r.b.lng]];L.polyline(p,{color:'#f59e0b',weight:5,dashArray:'2 10',lineCap:'round'}).addTo(routeLayer);pts=p;
-  }
+  if(r&&r.kind==='ojek'){const p=[[r.a.lat,r.a.lng],[r.b.lat,r.b.lng]];L.polyline(p,{color:'#f59e0b',weight:5,dashArray:'2 10'}).addTo(routeLayer);pts=p}
   if(r&&r.kind==='transit'){
-    r.legs.forEach(L_=>{const p=L_.stops.map(ll);L.polyline(p,{color:LN[L_.line].color,weight:8,opacity:.9}).addTo(routeLayer);pts=pts.concat(p)});
+    r.legs.forEach(L_=>{legGeom(L_).forEach(p=>L.polyline(p,{color:LN[L_.line].color,weight:8,opacity:.9}).addTo(routeLayer));pts=pts.concat(L_.stops.map(ll))});
     [[r.a,r.A],[r.b,r.B]].forEach(([p,A])=>{if(A.kind!=='none')L.polyline([[p.lat,p.lng],ll(A.stop)],{color:'#475569',weight:3,dashArray:'4 8'}).addTo(routeLayer);pts.push([p.lat,p.lng])});
   }
-  if(r){
-    L.marker([r.a.lat,r.a.lng],{icon:pin('#059669','A')}).addTo(routeLayer);
-    L.marker([r.b.lat,r.b.lng],{icon:pin('#e11d48','B')}).addTo(routeLayer);
-    map.fitBounds(pts,{padding:[40,40],maxZoom:15});
-  }
-  if(me)L.circleMarker(me,{radius:8,color:'#fff',weight:3,fillColor:'#2563eb',fillOpacity:1}).bindTooltip('Lokasi Saya').addTo(routeLayer);
-  drawBuses();
+  if(r){L.marker([r.a.lat,r.a.lng],{icon:pin('#059669','A')}).addTo(routeLayer);L.marker([r.b.lat,r.b.lng],{icon:pin('#e11d48','B')}).addTo(routeLayer);map.fitBounds(pts,{padding:[40,40],maxZoom:15})}
+  drawMe();drawBuses();
 }
-function pickStop(s){const el=pickToggle++%2===0?$('origin-input'):$('destination-input');el.value=ST[s][0];if(pickToggle%2===0)calculateRoutes();}
+function drawMe(){if(!meLayer)return;meLayer.clearLayers();if(me)L.circleMarker(me,{radius:8,color:'#fff',weight:3,fillColor:'#2563eb',fillOpacity:1}).bindTooltip(T('Lokasi Saya','My location')).addTo(meLayer)}
+function pickStop(s){const el=pickToggle++%2===0?$('origin-input'):$('destination-input');el.value=ST[s][0];if(pickToggle%2===0)calculateRoutes()}
 
-/* ---------- Simulasi bus live ---------- */
-let buses=[];
-function initBuses(){buses=[];LINES.forEach(l=>{const n=l.type==='bus'?2:1;for(let i=0;i<n;i++)buses.push({id:l.id+'-0'+(i+1),line:l.id,pos:(i+0.5)*(l.stops.length-1)/(n+0.3),dir:i%2?-1:1,load:crowd(l.id)})})}
-initBuses();
-let focusBus=null;
-function busPt(b){const L=LN[b.line],i=Math.min(Math.floor(b.pos),L.stops.length-2),f=b.pos-i;const a=ll(L.stops[i]),c=ll(L.stops[i+1]);return [a[0]+(c[0]-a[0])*f,a[1]+(c[1]-a[1])*f]}
+/* ===================== SIMULASI BUS ===================== */
+let buses=[],focusBus=null;
+function initBuses(){buses=[];LINES.forEach(l=>{if(l.stops.length<2)return;const n=l.type==='bus'?2:1;for(let i=0;i<n;i++)buses.push({id:l.id+'-0'+(i+1),line:l.id,pos:(i+0.5)*(l.stops.length-1)/(n+0.3),dir:i%2?-1:1,load:crowd(l.id,new Date())})})}
+function busPt(b){const L_=LN[b.line],i=Math.min(Math.floor(b.pos),L_.stops.length-2),f=b.pos-i,a=ll(L_.stops[i]),c=ll(L_.stops[i+1]);return [a[0]+(c[0]-a[0])*f,a[1]+(c[1]-a[1])*f]}
 function drawBuses(){
   if(!busLayer)return;busLayer.clearLayers();
-  buses.forEach(b=>{const c=LN[b.line].color;
-    L.circleMarker(busPt(b),{radius:focusBus===b.id?11:7,color:'#fff',weight:2,fillColor:c,fillOpacity:1})
-      .bindTooltip(b.id,{permanent:true,direction:'top',offset:[0,-6],className:'bus-tip'}).addTo(busLayer)});
+  buses.forEach(b=>{L.circleMarker(busPt(b),{radius:focusBus===b.id?11:7,color:'#fff',weight:2,fillColor:LN[b.line].color,fillOpacity:1}).bindTooltip(b.id,{permanent:true,direction:'top',offset:[0,-6],className:'bus-tip'}).addTo(busLayer)});
 }
 function renderLive(){
-  $('live-list').innerHTML=buses.map(b=>{const L=LN[b.line],c=crowdInfo(b.load),near=ST[L.stops[Math.round(b.pos)]][0],dest=ST[L.stops[b.dir>0?L.stops.length-1:0]][0];
+  $('live-list').innerHTML=buses.map(b=>{const L_=LN[b.line],c=crowdInfo(b.load),near=ST[L_.stops[Math.round(b.pos)]][0],dest=ST[L_.stops[b.dir>0?L_.stops.length-1:0]][0];
     return `<div onclick="focusBus='${b.id}';drawBuses();renderLive()" class="bg-white border rounded-xl p-3 shadow-sm cursor-pointer ${focusBus===b.id?'border-emerald-500':'border-slate-200'}">
-      <div class="flex justify-between items-center mb-1"><div class="flex items-center gap-2"><span class="text-white font-bold text-xs px-2 py-1 rounded" style="background:${L.color}">${b.id}</span><span class="font-semibold text-sm text-slate-800">Menuju ${dest}</span></div><span class="text-[11px] text-emerald-600 font-bold">● Live</span></div>
-      <div class="text-xs text-slate-500 mb-2">Dekat: <b class="text-slate-700">${near}</b></div>
-      <div class="flex justify-between text-xs"><span class="text-slate-500">Kepadatan</span><span class="font-semibold ${c[1]}">${c[0]} (${Math.round(b.load)}% terisi)</span></div>
+      <div class="flex justify-between items-center mb-1"><div class="flex items-center gap-2 min-w-0"><span class="text-white font-bold text-xs px-2 py-1 rounded" style="background:${L_.color}">${esc(b.id)}</span><span class="font-semibold text-sm text-slate-800 truncate">${T('Menuju','To')} ${esc(dest)}</span></div><span class="text-[11px] text-amber-600 font-bold">SIM</span></div>
+      <div class="text-xs text-slate-500 mb-2">${T('Dekat','Near')}: <b class="text-slate-700">${esc(near)}</b></div>
+      <div class="flex justify-between text-xs"><span class="text-slate-500">${T('Kepadatan','Crowding')}</span><span class="font-semibold ${c[1]}">${c[0]} (${Math.round(b.load)}%)</span></div>
       <div class="w-full bg-slate-100 rounded-full h-2 mt-1 overflow-hidden"><div class="${c[2]} h-2 rounded-full" style="width:${b.load}%"></div></div></div>`}).join('');
 }
 setInterval(()=>{
-  buses.forEach(b=>{const L=LN[b.line];b.pos+=b.dir*0.02*L.speed/20;const m=L.stops.length-1;if(b.pos>=m){b.pos=m;b.dir=-1}if(b.pos<=0){b.pos=0;b.dir=1}
-    b.load=Math.max(10,Math.min(98,b.load+(crowd(b.line)-b.load)*0.05+(Math.random()-.5)*3))});
+  buses.forEach(b=>{const L_=LN[b.line];b.pos+=b.dir*0.02*L_.speed/20;const m=L_.stops.length-1;if(b.pos>=m){b.pos=m;b.dir=-1}if(b.pos<=0){b.pos=0;b.dir=1}
+    b.load=Math.max(10,Math.min(98,b.load+(crowd(b.line,new Date())-b.load)*0.05+(Math.random()-.5)*3))});
   drawBuses();if(!$('panel-live').classList.contains('hidden'))renderLive();
 },1000);
 
-/* ---------- Feeder ---------- */
+/* ===================== FEEDER ===================== */
 function renderFeeder(){
-  if(!LINES.some(l=>l.type==='feeder')){$('feeder-list').innerHTML='<div class="text-xs text-slate-500 bg-slate-50 rounded-xl p-3">Data feeder WiraWiri belum tersedia. Klik "Muat ulang data halte dari OpenStreetMap" di tab Cari Rute; jika OSM memuatnya, rutenya akan muncul di sini.</div>';return}
-  $('feeder-list').innerHTML=LINES.filter(l=>l.type==='feeder').map(l=>{const m=new Date().getMinutes(),next=l.headway-(m%l.headway),p=crowd(l.id),c=crowdInfo(p);
+  const fl=LINES.filter(l=>l.type==='feeder');
+  if(!fl.length){$('feeder-list').innerHTML='<div class="text-xs text-slate-500 bg-slate-50 rounded-xl p-3">'+T('Data feeder WiraWiri belum tersedia. Buka tab Lainnya → "Muat ulang dari OSM"; jika OSM memuatnya, rutenya muncul di sini.','WiraWiri data not available yet. Open More → "Reload from OSM"; if OSM has it, routes appear here.')+'</div>';return}
+  $('feeder-list').innerHTML=fl.map(l=>{const m=new Date().getMinutes(),next=l.headway-(m%l.headway),p=crowd(l.id,new Date()),c=crowdInfo(p);
     return `<div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-2">
-      <div class="flex justify-between items-center"><span class="text-white font-bold text-xs px-2 py-1 rounded" style="background:${l.color}">${l.id}</span><span class="text-xs text-slate-500">Tarif ${rp(l.fare)} · tiap ${l.headway} mnt</span></div>
-      <div class="text-xs text-slate-600">${l.stops.map(s=>ST[s][0]).join(' → ')}</div>
-      <div class="flex justify-between text-xs"><span>Berangkat berikutnya: <b>${next} mnt lagi</b></span><span class="font-semibold ${c[1]}">${c[0]} (${p}%)</span></div>
-      <button onclick="$('origin-input').value='${ST[l.stops[0]][0]}';switchTab('planner')" class="w-full text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-lg py-1.5">Rute dari ${ST[l.stops[0]][0]}</button></div>`}).join('');
+      <div class="flex justify-between items-center"><span class="text-white font-bold text-xs px-2 py-1 rounded" style="background:${l.color}">${esc(l.id)}</span><span class="text-xs text-slate-500">${rp(l.fare)} · ${T('tiap','every')} ${l.headway} ${T('mnt','min')} (${T('perkiraan','est.')})</span></div>
+      <div class="text-xs text-slate-600">${esc(l.name)}<br>${l.stops.slice(0,6).map(s=>esc(ST[s][0])).join(' → ')}${l.stops.length>6?' …':''}</div>
+      <div class="flex justify-between text-xs"><span>${T('Berikutnya (sim.)','Next (sim.)')}: <b>${next} ${T('mnt lagi','min')}</b></span><span class="font-semibold ${c[1]}">${c[0]} (${p}%)</span></div>
+      <button onclick="$('origin-input').value=this.dataset.s;switchTab('planner')" data-s="${esc(ST[l.stops[0]][0])}" class="w-full text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-lg py-1.5">${T('Rute dari','Route from')} ${esc(ST[l.stops[0]][0])}</button></div>`}).join('');
 }
 
-/* ---------- Tab, asisten, init ---------- */
-function switchTab(t){
-  ['planner','live','feeder'].forEach(x=>{$('panel-'+x).classList.toggle('hidden',x!==t);const b=$('tab-'+x);b.className='flex-1 py-3 '+(x===t?'text-emerald-700 border-b-2 border-emerald-600 font-semibold':'text-slate-500')});
-  if(t==='live')renderLive();if(t==='feeder')renderFeeder();
+/* ===================== ALARM TURUN ===================== */
+let trip=null;
+function startTrip(){
+  const r=results[sel];if(!r||r.kind!=='transit')return toast(T('Pilih rute bus dulu.','Select a bus route first.'));
+  if(!navigator.geolocation)return toast(T('GPS tidak didukung.','GPS not supported.'));
+  stopTrip(true);
+  trip={targets:r.legs.map(L_=>L_.stops[L_.stops.length-1]),i:0,alerted:{},id:null};
+  trip.id=navigator.geolocation.watchPosition(onPos,()=>toast(T('GPS tidak bisa diakses. Izinkan lokasi (butuh https).','GPS unavailable. Allow location (https needed).'),4000),{enableHighAccuracy:true,maximumAge:5000});
+  $('trip').classList.remove('hidden');$('trip-msg').textContent='⏰ '+T('Menunggu sinyal GPS…','Waiting for GPS…');
+  toast(T('Alarm aktif. Biarkan layar menyala.','Alarm on. Keep the screen on.'));
 }
-function openAssistant(){
-  let h;
-  if(!results.length)h='<p>Cari rute dulu, lalu saya bantu bandingkan pilihan terbaik.</p>';
-  else{const f=[...results].sort((a,b)=>a.min-b.min)[0],c=[...results].sort((a,b)=>a.cost-b.cost)[0],t=results.filter(r=>r.crowd!==null).sort((a,b)=>a.crowd-b.crowd)[0];
-    h=`<p>⚡ <b>Tercepat:</b> ${f.min} mnt, ${rp(f.cost)}</p><p>💰 <b>Termurah:</b> ${rp(c.cost)}, ${c.min} mnt</p>${t?`<p>🧘 <b>Paling lega:</b> ${crowdInfo(t.crowd)[0]} (${t.crowd}%), ${t.min} mnt</p>`:''}<p class="text-xs text-slate-500">Tips: di jam sibuk (06.30–09.00 & 16.00–19.00) pilih rute dengan kepadatan rendah atau berangkat lebih awal.</p>`;}
-  $('modal-body').innerHTML=h;$('modal').classList.remove('hidden');$('modal').classList.add('flex');
+function onPos(p){
+  if(!trip)return;me=[p.coords.latitude,p.coords.longitude];drawMe();
+  const id=trip.targets[trip.i],d=hav(me,ll(id));
+  $('trip-msg').textContent='⏰ '+T('Turun di ','Get off at ')+ST[id][0]+' — '+(d<1?Math.round(d*1000)+' m':d.toFixed(1)+' km');
+  if(d<0.4&&!trip.alerted[trip.i]){trip.alerted[trip.i]=1;alarm(ST[id][0]);if(trip.i<trip.targets.length-1)trip.i++;else setTimeout(()=>stopTrip(),20000)}
 }
-try{const s=JSON.parse(localStorage.getItem('suroway')||'null');if(s){$('origin-input').value=s[0];$('destination-input').value=s[1]}}catch(e){}
+function alarm(name){
+  $('trip-msg').textContent='🔔 '+T('SEGERA TURUN: ','GET OFF SOON: ')+name;
+  try{navigator.vibrate&&navigator.vibrate([400,200,400,200,400])}catch(e){}
+  try{const c=new (window.AudioContext||window.webkitAudioContext)();[0,.35,.7].forEach(t=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.3,c.currentTime+t);o.start(c.currentTime+t);o.stop(c.currentTime+t+.25)})}catch(e){}
+  toast('🔔 '+name,6000);
+}
+function stopTrip(silent){if(trip&&trip.id!=null)navigator.geolocation.clearWatch(trip.id);trip=null;$('trip').classList.add('hidden');if(!silent)toast(T('Alarm dimatikan.','Alarm off.'))}
 
-/* ---------- Data halte & rute dari OpenStreetMap (Overpass API) ---------- */
+/* ===================== BAGIKAN ===================== */
+function enc(el){const p=resolve(el.value);if(!p)return el.value;return p.stop&&!favs.some(f=>f.label===p.name)?p.name:p.name+'|'+p.lat.toFixed(5)+'|'+p.lng.toFixed(5)}
+function dec(v){const [n,la,ln]=String(v).split('|');if(la&&ln&&isFinite(+la)&&isFinite(+ln))places[n.toLowerCase()]={name:n,lat:+la,lng:+ln};return n}
+async function shareRoute(){
+  const u=location.origin+location.pathname+'?o='+encodeURIComponent(enc($('origin-input')))+'&d='+encodeURIComponent(enc($('destination-input')));
+  const text='SuroWay: '+$('origin-input').value+' → '+$('destination-input').value;
+  try{if(navigator.share){await navigator.share({title:'SuroWay',text,url:u});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(u);toast(T('Tautan disalin.','Link copied.'))}catch(e){prompt(T('Salin tautan:','Copy link:'),u)}
+}
+
+/* ===================== DATA: data.json, OSM (Overpass), ekspor ===================== */
 const OV_URL='https://overpass-api.de/api/interpreter';
-const OV_Q='[out:json][timeout:40];area["name"="Surabaya"]["boundary"="administrative"]->.a;(rel(area.a)["route"="bus"]["name"~"Suroboyo|Semanggi|Wira",i];rel(area.a)["route"="bus"]["network"~"Suroboyo|Semanggi|Wira",i];)->.r;.r out body;node(r.r);out body qt;';
+const OV_Q='[out:json][timeout:60];area["name"="Surabaya"]["boundary"="administrative"]->.a;(rel(area.a)["route"="bus"]["name"~"Suroboyo|Semanggi|Wira",i];rel(area.a)["route"="bus"]["network"~"Suroboyo|Semanggi|Wira",i];)->.r;.r out body;node(r.r);out body qt;way(r.r);out geom qt;';
 const PALETTE=['#dc2626','#2563eb','#7c3aed','#ea580c','#0891b2','#059669','#d97706','#db2777','#4f46e5','#65a30d'];
 function parseOSM(d){
-  const nodes={},NS={},byRef={};
-  d.elements.filter(e=>e.type==='node').forEach(n=>nodes[n.id]=n);
-  const addStop=n=>{for(const id in NS){if(hav([n.lat,n.lon],[NS[id][1],NS[id][2]])<0.08)return id}
-    const id='o'+n.id;NS[id]=[(n.tags&&n.tags.name)||'Halte tanpa nama',n.lat,n.lon];return id};
+  const nodes={},ways={},NS={},byRef={};
+  d.elements.forEach(e=>{if(e.type==='node')nodes[e.id]=e;else if(e.type==='way'&&e.geometry)ways[e.id]=e});
+  const addStop=n=>{for(const id in NS){if(hav([n.lat,n.lon],[NS[id][1],NS[id][2]])<0.08){const w=n.tags&&n.tags.wheelchair;if(w&&!NS[id][3])NS[id][3]=w;return id}}
+    const id='o'+n.id;NS[id]=[(n.tags&&n.tags.name)||'Halte tanpa nama',n.lat,n.lon];const w=n.tags&&n.tags.wheelchair;if(w)NS[id][3]=w;return id};
   d.elements.filter(e=>e.type==='relation').forEach(r=>{
     const t=r.tags||{},ref=t.ref||t.name;if(!ref)return;
     const mem=r.members.filter(m=>m.type==='node'&&nodes[m.ref]);
     let st=mem.filter(m=>/^stop/.test(m.role));if(st.length<2)st=mem.filter(m=>/^platform/.test(m.role));
     if(st.length<2)return;
-    const cur=byRef[ref];if(!cur||cur.st.length<st.length)byRef[ref]={t,st};
+    const cur=byRef[ref];if(!cur||cur.st.length<st.length)byRef[ref]={t,st,r};
   });
   const lines=[];let i=0;
   for(const ref in byRef){
-    const {t,st}=byRef[ref];const ids=[];
-    st.forEach(m=>{const id=addStop(nodes[m.ref]);if(ids[ids.length-1]!==id&&!ids.includes(id))ids.push(id)});
+    const {t,st,r}=byRef[ref],ids=[];
+    st.forEach(m=>{const id=addStop(nodes[m.ref]);if(!ids.includes(id))ids.push(id)});
     if(ids.length<2)continue;
+    const geom=r.members.filter(m=>m.type==='way'&&!/platform/.test(m.role)&&ways[m.ref]).map(m=>ways[m.ref].geometry.map(p=>[+p.lat.toFixed(5),+p.lon.toFixed(5)]));
     const feeder=/wira/i.test((t.name||'')+(t.network||'')+(t.operator||''));
-    lines.push({id:String(ref).slice(0,12),name:t.name||String(ref),type:feeder?'feeder':'bus',
-      color:/^#[0-9a-f]{6}$/i.test(t.colour||'')?t.colour:PALETTE[i++%PALETTE.length],
-      headway:feeder?10:12,speed:feeder?18:22,fare:feeder?3000:5000,stops:ids});
+    const ln={id:String(ref).slice(0,12),name:t.name||String(ref),type:feeder?'feeder':'bus',
+      color:/^#[0-9a-f]{6}$/i.test(t.colour||'')?t.colour:PALETTE[i++%PALETTE.length],headway:feeder?10:12,speed:feeder?18:22,fare:feeder?3000:5000,stops:ids};
+    if(geom.length)ln.geom=geom;lines.push(ln);
   }
-  // pakai hanya halte yang dipakai jalur
   const used={};lines.forEach(l=>l.stops.forEach(s=>used[s]=NS[s]));
   return {ST:used,LINES:lines};
 }
-function setSrc(t,c){const e=$('datasrc');if(e){e.textContent=t;e.className=c||'text-slate-500'}}
+function setSrc(t,c){['datasrc','datasrc2'].forEach(id=>{const e=$(id);if(e){e.textContent=t;e.className=c||'text-slate-500'}})}
 function refreshUI(){
-  $('stoplist').innerHTML=Object.values(ST).map(s=>`<option value="${s[0].replace(/"/g,'&quot;')}">`).join('')+'<option value="Lokasi Saya">';
-  $('legend').innerHTML=LINES.map(l=>`<span><span style="color:${l.color}">●</span> ${l.id}</span>`).join('');
+  $('stoplist').innerHTML=favs.map(f=>`<option value="${esc(f.label)}">`).join('')+Object.values(ST).map(s=>`<option value="${esc(s[0])}">`).join('')+'<option value="Lokasi Saya">';
+  $('legend').innerHTML=LINES.map(l=>`<span><span style="color:${l.color}">●</span> ${esc(l.id)}</span>`).join('');
 }
-function applyData(data){
-  ST=data.ST;LINES=data.LINES;rebuildLN();initBuses();focusBus=null;refreshUI();results=[];sel=-1;
-  $('route-results').innerHTML='';
-  const find=re=>Object.keys(ST).find(id=>re.test(ST[id][0]));
-  const ids=Object.keys(ST);
+function applyData(data,label){
+  ST=data.ST;LINES=data.LINES;rebuildLN();initBuses();focusBus=null;refreshUI();results=[];sel=-1;$('route-results').innerHTML='';
+  const ids=Object.keys(ST),find=re=>ids.find(id=>re.test(ST[id][0]));
   if(!resolve($('origin-input').value))$('origin-input').value=ST[find(/purabaya|bungurasih/i)||ids[0]][0];
   if(!resolve($('destination-input').value))$('destination-input').value=ST[find(/tunjungan|\bTP\b/i)||ids[ids.length-1]][0];
   renderFeeder();
   if(map&&ids.length)map.fitBounds(ids.map(id=>[ST[id][1],ST[id][2]]),{padding:[30,30]});
-  calculateRoutes();
+  dataSrc=label;setSrc('Data: '+label+' ('+LINES.length+' '+T('rute','routes')+', '+ids.length+' '+T('halte','stops')+')','text-emerald-700');
+  calculateRoutes(true);
 }
-async function loadOSM(force){
-  if(!force){try{const c=JSON.parse(localStorage.getItem('suroway-osm')||'null');
-    if(c&&Date.now()-c.t<864e5&&c.data.LINES.length){applyData(c.data);setSrc('Data: OpenStreetMap (tersimpan, '+c.data.LINES.length+' rute, '+Object.keys(c.data.ST).length+' halte)','text-emerald-700');return}}catch(e){}}
-  setSrc('Memuat data halte dari OpenStreetMap…');
+const valid=d=>d&&d.ST&&Array.isArray(d.LINES)&&d.LINES.length&&d.LINES.every(l=>Array.isArray(l.stops)&&l.stops.length>1&&l.stops.every(s=>d.ST[s]));
+async function loadData(force){
+  if(!force){
+    try{const r=await fetch(CFG.dataUrl,{cache:'no-cache'});if(r.ok){const d=await r.json();if(valid(d)){applyData(d,'data.json');return}}}catch(e){}
+    const c=sget('suroway-osm',null);if(c&&Date.now()-c.t<864e5&&valid(c.data)){applyData(c.data,T('OSM (tersimpan)','OSM (cached)'));return}
+  }
+  setSrc(T('Memuat data dari OpenStreetMap… (bisa 10–40 detik)','Loading from OpenStreetMap… (10–40 s)'));
   try{
-    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),45000);
+    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),60000);
     const res=await fetch(OV_URL,{method:'POST',body:'data='+encodeURIComponent(OV_Q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});
     clearTimeout(to);if(!res.ok)throw new Error('HTTP '+res.status);
-    const data=parseOSM(await res.json());
-    if(!data.LINES.length)throw new Error('kosong');
-    try{localStorage.setItem('suroway-osm',JSON.stringify({t:Date.now(),data}))}catch(e){}
-    applyData(data);setSrc('Data: OpenStreetMap ('+data.LINES.length+' rute, '+Object.keys(data.ST).length+' halte). Periksa kelengkapannya.','text-emerald-700');
-  }catch(e){setSrc('OSM tidak bisa dimuat ('+e.message+'). Memakai data bawaan (perkiraan).','text-amber-700')}
+    const data=parseOSM(await res.json());if(!valid(data))throw new Error(T('data kosong','empty data'));
+    sset('suroway-osm',{t:Date.now(),data});applyData(data,'OpenStreetMap');
+  }catch(e){setSrc(T('OSM tidak bisa dimuat (','OSM unavailable (')+e.message+T('). Memakai data bawaan (perkiraan).','). Using built-in estimated data.'),'text-amber-700')}
 }
+function exportData(){
+  const blob=new Blob([JSON.stringify({ST,LINES,t:Date.now()})],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='data.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+/* ===================== TEMA, UKURAN, BAHASA, PWA ===================== */
+function setTheme(d){document.documentElement.classList.toggle('dark',d);const m=document.querySelector('meta[name=theme-color]');if(m)m.content=d?'#064e3b':'#059669'}
+function toggleTheme(){const d=!document.documentElement.classList.contains('dark');setTheme(d);sset('suroway-theme',d?'dark':'light')}
+function toggleSize(){const b=document.documentElement.classList.toggle('big');sset('suroway-big',b)}
+function applyLang(){
+  document.documentElement.lang=LANG;$('langBtn').textContent=LANG==='en'?'ID':'EN';
+  document.querySelectorAll('[data-en]').forEach(el=>{if(el.dataset.id===undefined)el.dataset.id=el.innerHTML;el.innerHTML=LANG==='en'?el.dataset.en:el.dataset.id});
+  const O={now:['Berangkat sekarang','Depart now'],dep:['Berangkat pukul','Depart at'],arr:['Tiba pukul','Arrive by']};
+  [...$('plan-mode').options].forEach(o=>o.textContent=O[o.value][LANG==='en'?1:0]);
+  const FC={umum:['Umum','General'],pelajar:['Pelajar','Student'],lansia:['Lansia','Senior']};
+  [...$('fare-cat').options].forEach(o=>o.textContent=FC[o.value][LANG==='en'?1:0]);
+}
+function toggleLang(){LANG=LANG==='en'?'id':'en';sset('suroway-lang',LANG);applyLang();renderResults();renderLive();renderFeeder();renderChips();if(dataSrc)setSrc($('datasrc').textContent)}
+let deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installBtn').classList.remove('hidden')});
+async function doInstall(){if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('installBtn').classList.add('hidden')}
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+/* ===================== ASISTEN, TAB, FEEDBACK ===================== */
+function openAssistant(){
+  let h;
+  if(!results.length)h='<p>'+T('Cari rute dulu, lalu saya bantu membandingkan pilihan terbaik.','Search a route first and I will compare the options.')+'</p>';
+  else{const f=[...results].sort((a,b)=>a.min-b.min)[0],c=[...results].sort((a,b)=>a.cost-b.cost)[0],t=results.filter(r=>r.crowd!==null).sort((a,b)=>a.crowd-b.crowd)[0];
+    h=`<p>⚡ <b>${T('Tercepat','Fastest')}:</b> ${f.min} ${T('mnt','min')}, ${rp(f.cost)}</p><p>💰 <b>${T('Termurah','Cheapest')}:</b> ${rp(c.cost)}, ${c.min} ${T('mnt','min')}</p>${t?`<p>🧘 <b>${T('Paling lega','Quietest')}:</b> ${crowdInfo(t.crowd)[0]} (${t.crowd}%), ${t.min} ${T('mnt','min')}</p>`:''}<p class="text-xs text-slate-500">${T('Tips: di jam sibuk (06.30–09.00 & 16.00–19.00) pilih rute yang lebih lega atau berangkat lebih awal.','Tip: at rush hour (06:30–09:00 & 16:00–19:00) pick a quieter route or leave earlier.')}</p>`;}
+  openModal(T('✨ Asisten Rute','✨ Route Assistant'),h);
+}
+function switchTab(t){
+  ['planner','live','feeder','more'].forEach(x=>{$('panel-'+x).classList.toggle('hidden',x!==t);$('tab-'+x).className='flex-1 py-3 '+(x===t?'text-emerald-700 border-b-2 border-emerald-600 font-semibold':'text-slate-500')});
+  if(t==='live')renderLive();if(t==='feeder')renderFeeder();
+}
+function sendFeedback(){
+  const txt=$('fb-text').value.trim();if(!txt)return toast(T('Tulis dulu isi laporannya.','Write your report first.'));
+  const body='[SuroWay] '+$('fb-type').value+'\n'+txt+'\n\nRute: '+$('origin-input').value+' → '+$('destination-input').value+'\nSumber data: '+dataSrc;
+  if(CFG.feedbackWA)window.open('https://wa.me/'+CFG.feedbackWA+'?text='+encodeURIComponent(body),'_blank');
+  else if(CFG.feedbackEmail)location.href='mailto:'+CFG.feedbackEmail+'?subject='+encodeURIComponent('Laporan SuroWay')+'&body='+encodeURIComponent(body);
+  else{try{navigator.clipboard.writeText(body);toast(T('Laporan disalin. Kirim ke pengelola aplikasi.','Report copied. Send it to the app maintainer.'),4000)}catch(e){prompt('Salin / Copy:',body)}}
+}
+
+/* ===================== INIT ===================== */
+setTheme(sget('suroway-theme',window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')==='dark');
+if(sget('suroway-big',false))document.documentElement.classList.add('big');
 ['origin-input','destination-input'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')calculateRoutes()}));
-initMap();refreshUI();switchTab('planner');setSrc('Data: bawaan (perkiraan)','text-amber-700');calculateRoutes();loadOSM(false);
+(function(){const q=new URLSearchParams(location.search);if(q.get('o'))$('origin-input').value=dec(q.get('o'));if(q.get('d'))$('destination-input').value=dec(q.get('d'))})();
+if(!new URLSearchParams(location.search).get('o')){const s=sget('suroway-last',null);if(s){$('origin-input').value=s[0];$('destination-input').value=s[1]}}
+$('plan-mode').addEventListener('change',()=>{});
+initBuses();initMap();refreshUI();renderChips();applyLang();switchTab('planner');
+setSrc(T('Data: bawaan (perkiraan)','Data: built-in (estimated)'),'text-amber-700');
+calculateRoutes(true).then(()=>loadData(false));
+window.addEventListener('beforeunload',()=>sset('suroway-last',[$('origin-input').value,$('destination-input').value]));
 </script>
 </body>
 </html>
