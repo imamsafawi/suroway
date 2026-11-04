@@ -4,7 +4,6 @@ const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.p
 self.addEventListener('install',e=>{
   e.waitUntil(
     caches.open(V).then(async c=>{
-      /* Tambahkan satu per satu; yang gagal dilewati agar install tetap sukses */
       await Promise.all(SHELL.map(u=>
         c.add(u).catch(err=>console.warn('SW: gagal cache',u,err))
       ));
