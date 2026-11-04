@@ -41,18 +41,20 @@ html.dark .text-rose-700,html.dark .text-rose-600{color:#fda4af}
 html.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9)}
 html.dark .leaflet-control,html.dark .leaflet-bar a{background:#1e293b;color:#e2e8f0}
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-/* [FIX #1] badge estimasi */
+/* badge estimasi */
 .est-badge{font-size:9px;font-weight:700;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:999px;margin-left:4px;vertical-align:middle}
 html.dark .est-badge{background:#451a03;color:#fcd34d}
-/* [FIX #10] banner GPS */
+/* banner GPS */
 #gps-banner{position:fixed;top:0;left:0;right:0;z-index:2000;background:#dc2626;color:#fff;font-size:12px;padding:8px 12px;text-align:center;font-weight:600;display:none}
 #gps-banner.show{display:block}
 #gps-banner button{background:#fff;color:#dc2626;border:none;padding:4px 10px;border-radius:6px;font-weight:700;margin-left:8px;cursor:pointer}
+/* ring pada tombol install saat siap */
+#installBtn.ready{box-shadow:0 0 0 2px #fcd34d}
 </style>
 </head>
 <body class="flex flex-col md:flex-row overflow-hidden">
 
-<!-- [FIX #10] Banner persisten jika GPS tidak aktif -->
+<!-- Banner persisten jika GPS tidak aktif -->
 <div id="gps-banner" role="alert">
   <span id="gps-banner-msg">⚠️ GPS tidak aktif — alarm turun tidak akan berbunyi.</span>
   <button onclick="retryGps()">Coba lagi</button>
@@ -66,7 +68,8 @@ html.dark .est-badge{background:#451a03;color:#fcd34d}
       <div class="min-w-0"><h1 class="font-extrabold text-xl leading-none">SuroWay</h1><p class="text-[11px] text-emerald-100 truncate">Smart Transit Planner Surabaya</p></div>
     </div>
     <div class="flex items-center gap-1 text-sm">
-      <button id="installBtn" onclick="doInstall()" class="hidden bg-white/20 rounded-lg px-2 py-1" title="Pasang aplikasi">📲</button>
+      <!-- Tombol install SELALU terlihat; fallback manual jika prompt tidak tersedia -->
+      <button id="installBtn" onclick="doInstall()" class="bg-white/20 rounded-lg px-2 py-1" title="Pasang aplikasi" aria-label="Pasang aplikasi">📲</button>
       <button onclick="toggleTheme()" class="bg-white/20 rounded-lg px-2 py-1" title="Mode gelap / Dark mode" aria-label="Mode gelap">🌓</button>
       <button onclick="toggleSize()" class="bg-white/20 rounded-lg px-2 py-1 font-bold" title="Ukuran teks / Text size" aria-label="Ukuran teks">A+</button>
       <button onclick="toggleLang()" id="langBtn" class="bg-white/20 rounded-lg px-2 py-1 font-bold" title="Bahasa / Language">EN</button>
@@ -165,7 +168,13 @@ html.dark .est-badge{background:#451a03;color:#fcd34d}
         </div>
         <p class="text-slate-400" data-en="Upload data.json next to index.html to make the app load instantly and independently of the Overpass server.">Unggah data.json di samping index.html agar aplikasi memuat data seketika tanpa bergantung pada server Overpass.</p>
       </div>
-      <!-- [FIX #10] Tes alarm -->
+      <!-- Diagnostik PWA -->
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
+        <h3 class="font-bold text-slate-700">Diagnostik</h3>
+        <p class="text-slate-500">Cek apakah aplikasi memenuhi syarat install PWA.</p>
+        <button onclick="diagnosePWA()" class="w-full bg-white border border-slate-300 rounded-lg py-2 font-semibold">🔍 Cek status install</button>
+      </div>
+      <!-- Tes alarm -->
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
         <h3 class="font-bold text-slate-700" data-en="Stop alarm">Alarm turun</h3>
         <p class="text-slate-500" data-en="Test that sound and vibration work on this device.">Tes apakah suara dan getaran berfungsi di perangkat ini.</p>
@@ -228,7 +237,6 @@ function openModal(title,html){$('modal-title').textContent=title;$('modal-body'
 function closeModal(){$('modal').classList.add('hidden');$('modal').classList.remove('flex')}
 
 /* ===================== DATA BAWAAN (PERKIRAAN, cadangan) ===================== */
-/* [FIX #3] tambah first_departure & last_departure per line untuk jadwal */
 let ST={
 pur:['Terminal Purabaya (Bungurasih)',-7.3507,112.7253],
 wono:['Halte DTC Wonokromo',-7.302165,112.738093],
@@ -260,15 +268,13 @@ let LN={};const rebuildLN=()=>{LN={};LINES.forEach(l=>LN[l.id]=l)};rebuildLN();
 
 let me=null,results=[],sel=-1,pickToggle=0,lastField='destination-input',places={},plan={mode:'now',date:new Date()},baseDate=new Date(),dataSrc='bawaan';
 
-/* [FIX #3] Konversi "HH:MM" ke menit sejak tengah malam */
 function hm2min(s){if(!s)return null;const [h,m]=String(s).split(':').map(Number);if(!isFinite(h)||!isFinite(m))return null;return h*60+m}
-/* [FIX #3] Waktu tunggu berikutnya berdasarkan jadwal. Return menit, atau Infinity jika di luar jam operasi. */
 function waitMin(line,now){
   const hd=line.headway||12, fd=hm2min(line.first_departure), ld=hm2min(line.last_departure);
-  if(fd==null||ld==null)return hd/2; // fallback ke perilaku lama
+  if(fd==null||ld==null)return hd/2;
   const cur=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
-  if(cur<fd)return fd-cur;            // belum beroperasi: tunggu sampai keberangkatan pertama
-  if(cur>ld)return Infinity;          // sudah tutup
+  if(cur<fd)return fd-cur;
+  if(cur>ld)return Infinity;
   const mod=(cur-fd)%hd;
   return mod<0.1?0:hd-mod;
 }
@@ -283,7 +289,6 @@ function crowd(id,d){
 const crowdInfo=p=>p<45?[T('Lega','Quiet'),'text-emerald-700','bg-emerald-500']:p<75?[T('Sedang','Moderate'),'text-amber-700','bg-amber-500']:[T('Padat','Crowded'),'text-rose-700','bg-rose-500'];
 
 /* ===================== ROUTING ===================== */
-/* [FIX #3] dijk sekarang menerima parameter waktu (Date) untuk waitMin */
 function dijk(from,to,types,pen,wc,when){
   if(from===to)return null;
   const bad=s=>wc&&ST[s][3]==='no';
@@ -342,8 +347,7 @@ function resolve(text){
   return id?{name:ST[id][0],lat:ST[id][1],lng:ST[id][2],stop:id}:null;
 }
 
-/* [FIX #10] Status GPS global */
-let gpsOk=null; // null=belum dicek, true=ok, false=gagal
+let gpsOk=null;
 function showGpsBanner(msg){
   $('gps-banner-msg').textContent=msg||T('⚠️ GPS tidak aktif — alarm turun tidak akan berbunyi.','⚠️ GPS inactive — stop alarm will not sound.');
   $('gps-banner').classList.add('show');
@@ -364,7 +368,6 @@ function useCurrentLocation(){
     err=>{gpsOk=false;showGpsBanner(T('GPS diblokir: '+err.message,'GPS blocked: '+err.message));showMsg(T('Lokasi tidak bisa diakses. Izinkan akses lokasi (perlu https) atau pilih halte manual.','Location unavailable. Allow location access (https required) or pick a stop.'))},{timeout:10000});
 }
 
-/* [FIX #8] swap memicu ulang routing */
 function swapLocations(){
   const o=$('origin-input'),d=$('destination-input'),t=o.value;
   o.value=d.value;d.value=t;
@@ -372,32 +375,21 @@ function swapLocations(){
   else showMsg('');
 }
 
-/* [FIX #7] Debounce + cache Nominatim (1 req/detik, cache 24 jam) */
+/* Debounce + cache Nominatim (1 req/detik, cache 24 jam) */
 const NOM_CACHE_KEY='suroway-nomcache';
 let nomCache=sget(NOM_CACHE_KEY,{});
 let nomLastReq=0;
-let nomPending=null;
-function nomCacheGet(q){
-  const c=nomCache[q];
-  if(c&&Date.now()-c.t<864e5)return c.list;
-  return null;
-}
+function nomCacheGet(q){const c=nomCache[q];if(c&&Date.now()-c.t<864e5)return c.list;return null}
 function nomCacheSet(q,list){
   nomCache[q]={t:Date.now(),list};
-  // batasi cache 100 entri
   const keys=Object.keys(nomCache);
   if(keys.length>100){keys.sort((a,b)=>nomCache[a].t-nomCache[b].t);keys.slice(0,20).forEach(k=>delete nomCache[k])}
   sset(NOM_CACHE_KEY,nomCache);
 }
 async function geocode(q){
-  q=q.trim();
-  if(!q)return [];
-  // [FIX #7] cache hit
-  const hit=nomCacheGet(q);
-  if(hit){return hit}
-  // [FIX #7] throttle: minimal 1000ms antar request
-  const now=Date.now();
-  const wait=Math.max(0,1000-(now-nomLastReq));
+  q=q.trim();if(!q)return [];
+  const hit=nomCacheGet(q);if(hit)return hit;
+  const now=Date.now(),wait=Math.max(0,1000-(now-nomLastReq));
   if(wait>0)await new Promise(r=>setTimeout(r,wait));
   nomLastReq=Date.now();
   showMsg(T('Mencari alamat…','Searching address…'),true);
@@ -405,14 +397,11 @@ async function geocode(q){
     const u='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=id&bounded=1&viewbox=112.55,-7.10,112.90,-7.45&accept-language='+LANG+'&q='+encodeURIComponent(q);
     const r=await fetch(u,{headers:{'Accept':'application/json'}});
     if(!r.ok)throw new Error(r.status);
-    const j=await r.json();
-    showMsg('');
+    const j=await r.json();showMsg('');
     const list=j.map(x=>{const p=x.display_name.split(',').map(s=>s.trim());return {name:((x.name||p[0])+(p[1]?' ('+p.slice(1,3).join(', ')+')':'')).slice(0,80),lat:+x.lat,lng:+x.lon}});
-    nomCacheSet(q,list);
-    return list;
+    nomCacheSet(q,list);return list;
   }catch(e){
-    showMsg(T('Pencarian alamat gagal (perlu internet).','Address search failed (internet required).'));
-    return [];
+    showMsg(T('Pencarian alamat gagal (perlu internet).','Address search failed (internet required).'));return [];
   }
 }
 function showGeo(fieldId,list){
@@ -452,12 +441,9 @@ function readPlan(){
   baseDate=mode==='arr'?new Date(date.getTime()-30*6e4):date;
 }
 
-/* [FIX #9] Indikator loading pada tombol */
 function setBusy(b){
-  const btn=$('calcBtn');
-  if(!btn)return;
-  btn.disabled=b;
-  btn.classList.toggle('opacity-60',b);
+  const btn=$('calcBtn');if(!btn)return;
+  btn.disabled=b;btn.classList.toggle('opacity-60',b);
   btn.textContent=b?T('⏳ Mencari rute…','⏳ Finding routes…'):T('🔍 Cari Rute Terbaik','🔍 Find Best Route');
 }
 
@@ -490,7 +476,6 @@ async function calculateRoutes(auto){
 function closeGeo(){$('geo').classList.add('hidden')}
 const legBadge=L=>{const l=LN[L.line];return `<span class="px-2 py-0.5 rounded-md text-white text-xs font-bold" style="background:${l.color}">${l.type==='bus'?'🚌':'🚐'} ${esc(l.id)}</span>`};
 const accIcon=A=>A.kind==='walk'?`<span>🚶 ${Math.max(1,Math.round(A.min))} ${T('mnt','min')}</span>`:A.kind==='ojek'?`<span class="text-amber-700">🏍️ ${Math.round(A.min)} ${T('mnt','min')}</span>`:'';
-/* [FIX #1] helper badge estimasi */
 const estBadge=()=>`<span class="est-badge" title="${T('Perkiraan, bukan tarif resmi','Estimate, not official fare')}">${T('estimasi','est.')}</span>`;
 
 function renderResults(){
@@ -503,7 +488,6 @@ function renderResults(){
     let timeTxt;
     if(plan.mode==='arr')timeTxt=T('Berangkat paling lambat ','Leave by ')+'<b>'+hhmm(new Date(plan.date.getTime()-r.min*6e4))+'</b>';
     else timeTxt=T('Estimasi tiba: ','Arrive about: ')+'<b>'+hhmm(new Date(plan.date.getTime()+r.min*6e4))+'</b>';
-    /* [FIX #2] kepadatan diberi label "perkiraan" dan tooltip */
     let cw='';
     if(r.crowd!==null){const c=crowdInfo(r.crowd);
       cw=`<div class="flex justify-between text-xs pt-2 border-t border-slate-100">
@@ -528,7 +512,6 @@ function steps(r){
     o.push(from?`<div>${verb} ${A.km.toFixed(1)} km ${T('dari','from')} <b>${esc(p.name)}</b> ${T('ke','to')} <b>${esc(ST[A.stop][0])}</b></div>`:`<div>${verb} ${A.km.toFixed(1)} km ${T('dari','from')} <b>${esc(ST[A.stop][0])}</b> ${T('ke','to')} <b>${esc(p.name)}</b></div>`)};
   acc(r.A,r.a,true);
   r.legs.forEach(L=>{const l=LN[L.line],w=L.stops.some(s=>ST[s][3]==='no')?' ⚠️♿':'';
-    /* [FIX #3] tampilkan jadwal keberangkatan jika tersedia */
     const sched=l.first_departure?` (${T('jadwal','sched.')} ${l.first_departure}–${l.last_departure}, ${T('tiap','every')} ${l.headway} ${T('mnt','min')})`:` (${T('tunggu ±','wait ~')}${Math.round(l.headway/2)} ${T('mnt','min')})`;
     o.push(`<div>${l.type==='bus'?'🚌':'🚐'} ${T('Naik','Board')} <b>${esc(l.name)}</b> ${T('di','at')} <b>${esc(ST[L.stops[0]][0])}</b>, ${T('turun di','get off at')} <b>${esc(ST[L.stops[L.stops.length-1]][0])}</b> (${L.stops.length-1} ${T('halte','stops')}${sched})${w}</div>`)});
   acc(r.B,r.b,false);return o.join('');
@@ -610,7 +593,6 @@ function renderFeeder(){
 /* ===================== ALARM TURUN ===================== */
 let trip=null;
 function testAlarm(){
-  /* [FIX #10] tes alarm tanpa perlu rute */
   alarm(T('Tes alarm berhasil','Alarm test successful'));
   if(!navigator.vibrate)toast(T('Getaran tidak didukung browser ini.','Vibration not supported by this browser.'),4000);
 }
@@ -631,7 +613,6 @@ function startTrip(){
   gpsOk=true;dismissGpsBanner();
   $('trip').classList.remove('hidden');
   $('trip-msg').textContent='⏰ '+T('Menunggu sinyal GPS…','Waiting for GPS…');
-  /* [FIX #11] peringatan layar mati */
   toast(T('Alarm aktif. Jangan kunci layar — GPS berhenti saat layar mati.','Alarm on. Do not lock screen — GPS stops when screen is off.'),6000);
 }
 function onPos(p){
@@ -671,7 +652,6 @@ const OV_UA='SuroWay/1.0 (transit planner Surabaya)';
 const OSM_CACHE_TTL=7*864e5;
 const PALETTE=['#dc2626','#2563eb','#7c3aed','#ea580c','#0891b2','#059669','#d97706','#db2777','#4f46e5','#65a30d'];
 
-/* [FIX #4] parseOSM memisahkan arah forward/backward */
 function parseOSM(d){
   const nodes={},ways={},NS={};
   d.elements.forEach(e=>{if(e.type==='node')nodes[e.id]=e;else if(e.type==='way'&&e.geometry)ways[e.id]=e});
@@ -679,42 +659,32 @@ function parseOSM(d){
     for(const id in NS){if(hav([n.lat,n.lon],[NS[id][1],NS[id][2]])<0.08){const w=n.tags&&n.tags.wheelchair;if(w&&!NS[id][3])NS[id][3]=w;return id}}
     const id='o'+n.id;NS[id]=[(n.tags&&n.tags.name)||'Halte tanpa nama',n.lat,n.lon];const w=n.tags&&n.tags.wheelchair;if(w)NS[id][3]=w;return id;
   };
-
-  /* Kelompokkan relasi per (ref, direction) agar arah pergi/pulang tidak tercampur */
   const groups={};
   d.elements.filter(e=>e.type==='relation').forEach(r=>{
     const t=r.tags||{};
-    const ref=t.ref||t.name;
-    if(!ref)return;
+    const ref=t.ref||t.name;if(!ref)return;
     const mem=r.members.filter(m=>m.type==='node'&&nodes[m.ref]);
     let st=mem.filter(m=>/^stop/.test(m.role));
     if(st.length<2)st=mem.filter(m=>/^platform/.test(m.role));
     if(st.length<2)return;
-    /* [FIX #4] tentukan arah: dari tag direction, atau dari majority role member */
     let dir=t.direction||'';
     if(!dir){
       const fw=mem.filter(m=>m.role==='forward').length;
       const bw=mem.filter(m=>m.role==='backward').length;
-      if(fw>bw)dir='forward';
-      else if(bw>fw)dir='backward';
-      else dir='';
+      if(fw>bw)dir='forward';else if(bw>fw)dir='backward';else dir='';
     }
-    /* [FIX #4] kunci grup: ref + arah. Jika tidak ada arah, gabung jadi satu. */
     const key=ref+'|'+(dir||'*');
     if(!groups[key])groups[key]={ref,dir,t,rels:[]};
     groups[key].rels.push({t,st,r});
   });
-
   const lines=[];let i=0;
   for(const key in groups){
     const g=groups[key];
-    /* Pilih relasi dengan stop terbanyak sebagai basis (biasanya yang terlengkap) */
     g.rels.sort((a,b)=>b.st.length-a.st.length);
     const base=g.rels[0];
     const ids=[];
     base.st.forEach(m=>{const id=addStop(nodes[m.ref]);if(!ids.includes(id))ids.push(id)});
     if(ids.length<2)continue;
-    /* Gabungkan geometri dari semua relasi dalam grup yang sama (satu arah) */
     const geom=[];
     g.rels.forEach(({r})=>{
       r.members.filter(m=>m.type==='way'&&!/platform/.test(m.role)&&ways[m.ref]).forEach(m=>{
@@ -827,31 +797,110 @@ function toggleLang(){LANG=LANG==='en'?'id':'en';sset('suroway-lang',LANG);apply
 
 /* ===================== INSTALASI KE HP ===================== */
 let deferredInstall=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('installBtn').classList.remove('hidden')});
+let installAvailable=false;
+
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredInstall=e;installAvailable=true;
+  const btn=$('installBtn');
+  if(btn){btn.classList.add('ready');btn.title='Pasang aplikasi (siap!)'}
+});
+
+window.addEventListener('appinstalled',()=>{
+  installAvailable=false;deferredInstall=null;
+  const btn=$('installBtn');
+  if(btn)btn.style.display='none';
+  toast('✅ SuroWay dipasang.',4000);
+});
+
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone===true
+      || document.referrer.startsWith('android-app://');
+}
+
 async function doInstall(){
+  if(isStandalone()){
+    return openModal('SuroWay sudah terpasang',
+      '<p>Aplikasi sudah berjalan sebagai PWA. Buka dari ikon di layar utama.</p>');
+  }
   if(deferredInstall){
     deferredInstall.prompt();
     const {outcome}=await deferredInstall.userChoice;
-    deferredInstall=null;$('installBtn').classList.add('hidden');
-    if(outcome==='accepted')toast(T('SuroWay dipasang.','SuroWay installed.'));
+    deferredInstall=null;installAvailable=false;
+    const btn=$('installBtn');if(btn)btn.classList.remove('ready');
+    if(outcome==='accepted')toast('SuroWay dipasang.');
+    else toast('Instalasi dibatalkan.');
     return;
   }
-  /* Fallback: iOS Safari tidak punya beforeinstallprompt */
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const ua=navigator.userAgent;
+  const isIOS=/iPad|iPhone|iPod/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  const isSafariIOS=isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  if(isSafariIOS){
+    return openModal('Pasang di iPhone / iPad',
+      `<ol class="list-decimal pl-5 space-y-2">
+        <li>Ketuk tombol <b>Bagikan</b> <span style="font-size:18px">⎋</span> di bagian bawah Safari.</li>
+        <li>Gulir dan pilih <b>Tambahkan ke Layar Utama</b>.</li>
+        <li>Ketuk <b>Tambah</b> di kanan atas.</li>
+      </ol>
+      <p class="text-xs text-slate-500 mt-2">Ikon SuroWay akan muncul di layar utama seperti aplikasi biasa.</p>`);
+  }
   if(isIOS){
-    openModal(T('Pasang SuroWay di iPhone','Install SuroWay on iPhone'),
-      `<p>${T('Safari tidak mendukung tombol pasang otomatis. Ikuti langkah ini:','Safari does not support an automatic install button. Follow these steps:')}</p>
-       <ol class="list-decimal pl-4 space-y-1">
-         <li>${T('Ketuk tombol <b>Bagikan</b> (kotak dengan panah ke atas) di bawah Safari.','Tap the <b>Share</b> button (square with arrow up) at the bottom of Safari.')}</li>
-         <li>${T('Pilih <b>Tambahkan ke Layar Utama</b>.','Choose <b>Add to Home Screen</b>.')}</li>
-         <li>${T('Ketuk <b>Tambah</b>. SuroWay akan muncul seperti aplikasi.','Tap <b>Add</b>. SuroWay will appear like an app.')}</li>
-       </ol>`);
-    return;
+    return openModal('Pasang di iPhone / iPad',
+      '<p>Buka halaman ini di <b>Safari</b> (bukan Chrome/Firefox di iOS) untuk memasang aplikasi.</p>');
   }
-  /* Fallback lain: Android tanpa beforeinstallprompt (mis. sudah terpasang, atau browser lain) */
-  openModal(T('Pasang SuroWay','Install SuroWay'),
-    `<p>${T('Buka menu browser (⋮) lalu pilih <b>Instal aplikasi</b> / <b>Tambahkan ke Layar Utama</b>.','Open the browser menu (⋮) and choose <b>Install app</b> / <b>Add to Home screen</b>.')}</p>
-     <p class="text-xs text-slate-500">${T('Pastikan halaman dibuka lewat HTTPS agar PWA bisa dipasang.','Make sure the page is opened over HTTPS so PWA can be installed.')}</p>`);
+  const isAndroid=/Android/.test(ua);
+  if(isAndroid){
+    return openModal('Pasang di Android',
+      `<p>Browser Anda tidak mendukung tombol pasang otomatis. Ikuti langkah manual:</p>
+       <ol class="list-decimal pl-5 space-y-2">
+         <li>Buka menu browser (⋮ atau ≡).</li>
+         <li>Pilih <b>Install app</b> / <b>Tambahkan ke Layar Utama</b> / <b>Add to Home screen</b>.</li>
+         <li>Konfirmasi.</li>
+       </ol>
+       <p class="text-xs text-slate-500 mt-2">Jika opsi tidak ada, buka halaman ini di Chrome.</p>`);
+  }
+  openModal('Pasang SuroWay',
+    `<p>Di desktop Chrome/Edge: klik ikon <b>install</b> (⊕) di address bar, atau menu ⋮ → <b>Install SuroWay</b>.</p>
+     <p class="text-xs text-slate-500 mt-2">Pastikan halaman dibuka lewat HTTPS.</p>`);
+}
+
+/* Diagnostik PWA */
+async function diagnosePWA(){
+  const lines=[];
+  const ok=v=>v?'✅':'❌';
+  lines.push(`${ok(location.protocol==='https:'||location.hostname==='localhost')} HTTPS: ${location.protocol}//${location.hostname}`);
+  lines.push(`${ok(isStandalone())} Mode standalone: ${isStandalone()?'ya':'tidak'}`);
+  const link=document.querySelector('link[rel=manifest]');
+  lines.push(`${ok(!!link)} Tag <link rel=manifest>: ${link?link.href:'tidak ada'}`);
+  if(link){
+    try{
+      const r=await fetch(link.href);
+      const ct=r.headers.get('content-type')||'';
+      lines.push(`${ok(r.ok)} Manifest HTTP: ${r.status} (${ct})`);
+      const m=await r.json();
+      const has192=(m.icons||[]).some(i=>/192/.test(i.sizes||'')&&(!i.purpose||i.purpose.includes('any')));
+      const has512=(m.icons||[]).some(i=>/512/.test(i.sizes||'')&&(!i.purpose||i.purpose.includes('any')));
+      lines.push(`${ok(has192)} Ikon 192×192 purpose=any`);
+      lines.push(`${ok(has512)} Ikon 512×512 purpose=any`);
+      lines.push(`${ok(m.start_url)} start_url: ${m.start_url}`);
+      lines.push(`${ok(m.display==='standalone'||m.display==='fullscreen'||m.display==='minimal-ui')} display: ${m.display}`);
+    }catch(e){
+      lines.push(`❌ Manifest tidak bisa dibaca: ${e.message}`);
+    }
+  }
+  if('serviceWorker' in navigator){
+    const regs=await navigator.serviceWorker.getRegistrations();
+    lines.push(`${ok(regs.length>0)} Service worker terdaftar: ${regs.length}`);
+    const active=regs.find(r=>r.active);
+    lines.push(`${ok(!!active)} SW aktif: ${active?active.active.state:'tidak ada'}`);
+  }else{
+    lines.push('❌ Service worker tidak didukung');
+  }
+  lines.push(`${ok(installAvailable)} Event beforeinstallprompt: ${installAvailable?'sudah terpicu':'belum terpicu'}`);
+  openModal('Diagnostik PWA',
+    `<pre style="font-size:11px;line-height:1.5;white-space:pre-wrap;background:#f1f5f9;padding:8px;border-radius:8px;color:#0f172a">${lines.join('\n')}</pre>
+     <p class="text-xs text-slate-500 mt-2">Jika semua ✅ tapi tombol belum muncul, kemungkinan aplikasi sudah pernah di-install atau di-dismiss. Reset lewat Chrome → Site settings.</p>`);
 }
 
 if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
@@ -880,7 +929,6 @@ function sendFeedback(){
 setTheme(sget('suroway-theme',window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')==='dark');
 if(sget('suroway-big',false))document.documentElement.classList.add('big');
 ['origin-input','destination-input'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')calculateRoutes()}));
-/* [FIX #12] simpan input pada change juga (beforeunload tidak reliable di iOS) */
 ['origin-input','destination-input'].forEach(i=>{
   let t=null;
   $(i).addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>sset('suroway-last',[$('origin-input').value,$('destination-input').value]),500)});
@@ -892,7 +940,6 @@ initBuses();initMap();refreshUI();renderChips();applyLang();switchTab('planner')
 setSrc(T('Data: bawaan (perkiraan)','Data: built-in (estimated)'),'text-amber-700');
 calculateRoutes(true).then(()=>loadData(false));
 window.addEventListener('beforeunload',()=>sset('suroway-last',[$('origin-input').value,$('destination-input').value]));
-/* [FIX #10] cek GPS saat init, tampilkan banner jika ditolak */
 if('geolocation' in navigator){
   navigator.permissions&&navigator.permissions.query({name:'geolocation'}).then(p=>{
     if(p.state==='denied'){gpsOk=false;showGpsBanner(T('Izin lokasi ditolak — alarm turun tidak akan berbunyi. Buka pengaturan browser untuk mengizinkan.','Location permission denied — stop alarm will not sound. Open browser settings to allow.'))}
